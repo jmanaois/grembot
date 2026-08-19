@@ -3,7 +3,12 @@ import { Client, Events, GatewayIntentBits, MessageFlags, PermissionFlagsBits } 
 import { findJapaneseCards, resolveCardQuery, CardSiteError } from "./card-site.js";
 import { buildCardMessage, buildSearchResultComponents } from "./card-response.js";
 import { getCardImageFile } from "./card-image.js";
-import { getEnglishCardPricing } from "./oshi-card-api.js";
+import {
+  findEnglishCardsByNumber,
+  getEnglishCardPricing,
+  OshiCardApiError,
+  resolveEnglishCardQuery
+} from "./oshi-card-api.js";
 
 if (!process.env.DISCORD_TOKEN) {
   throw new Error("DISCORD_TOKEN must be set. Copy .env.example to .env.");
@@ -20,12 +25,15 @@ client.on(Events.InteractionCreate, async interaction => {
     if (interaction.isChatInputCommand() && interaction.commandName === "card") {
       const query = interaction.options.getString("query", true);
       await interaction.deferReply();
-      const resolved = await resolveCardQuery(query);
+      let resolved = await resolveCardQuery(query);
+      if (resolved.cards.length === 0) {
+        resolved = await resolveEnglishCardQuery(query);
+      }
       let cards = resolved.cards;
       const searchResults = resolved.searchResults;
       const requestedRarity = resolved.rarity;
       if (cards.length === 0) {
-        await interaction.editReply(`No Japanese card matched “${query}”. Check the card number, English name, or rarity and try again.`);
+        await interaction.editReply(`No Japanese or English card matched “${query}”. Check the card number, name, or rarity and try again.`);
         return;
       }
 
@@ -33,17 +41,19 @@ client.on(Events.InteractionCreate, async interaction => {
       const canAttachFiles = interaction.appPermissions?.has(PermissionFlagsBits.AttachFiles) ?? false;
       const currentMessage = async () => {
         const selectedCard = cards[selectedVariant];
-        const imagePromise = canAttachFiles
+        const imagePromise = canAttachFiles && selectedCard.imageUrl
           ? getCardImageFile(selectedCard).catch(error => {
             console.warn(`Could not attach ${selectedCard.imageUrl}; using the remote image URL.`, error);
             return null;
           })
           : Promise.resolve(null);
-        const pricingPromise = getEnglishCardPricing(selectedCard.number, selectedCard.rarity)
-          .catch(error => {
-            console.warn(`Could not load English pricing for ${selectedCard.number} [${selectedCard.rarity}].`, error);
-            return null;
-          });
+        const pricingPromise = selectedCard.edition === "english"
+          ? Promise.resolve(selectedCard.englishPricing)
+          : getEnglishCardPricing(selectedCard.number, selectedCard.rarity)
+            .catch(error => {
+              console.warn(`Could not load English pricing for ${selectedCard.number} [${selectedCard.rarity}].`, error);
+              return null;
+            });
         const [imageFile, englishPricing] = await Promise.all([imagePromise, pricingPromise]);
         const cardMessage = buildCardMessage(cards, selectedVariant, imageFile, englishPricing);
         return {
@@ -77,13 +87,15 @@ client.on(Events.InteractionCreate, async interaction => {
 
         await componentInteraction.deferUpdate();
         try {
-          const allSelectedCards = await findJapaneseCards(componentInteraction.values[0]);
-          const selectedCards = requestedRarity
-            ? allSelectedCards.filter(card => card.rarity.toUpperCase() === requestedRarity)
-            : allSelectedCards;
+          const selectedNumber = componentInteraction.values[0];
+          const selectedCards = cards[0]?.edition === "english"
+            ? await findEnglishCardsByNumber(selectedNumber, requestedRarity)
+            : (await findJapaneseCards(selectedNumber)).filter(card =>
+              !requestedRarity || card.rarity.toUpperCase() === requestedRarity
+            );
           if (selectedCards.length === 0) {
             await interaction.followUp({
-              content: "No Japanese card matched that selection.",
+              content: "No card matched that selection.",
               flags: MessageFlags.Ephemeral
             });
             return;
@@ -105,6 +117,8 @@ client.on(Events.InteractionCreate, async interaction => {
     console.error(error);
     const message = error instanceof CardSiteError
       ? `Could not search the card catalogue: ${error.message}`
+      : error instanceof OshiCardApiError
+        ? `Could not search the English card catalogue: ${error.message}`
       : "Something went wrong while searching for that card. Please try again in a moment.";
     if (interaction.deferred || interaction.replied) await interaction.editReply({ content: message, embeds: [], components: [] }).catch(() => {});
     else await interaction.reply({ content: message, flags: MessageFlags.Ephemeral }).catch(() => {});

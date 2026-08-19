@@ -1,6 +1,6 @@
 # Grembot
 
-A Discord bot that looks up **Japanese-edition** hololive OFFICIAL CARD GAME cards by card number. It reads the public Japanese card catalogue live, so newly published cards do not require a bot update.
+A Discord bot that looks up hololive OFFICIAL CARD GAME cards by card number or English name. Japanese editions come from the public official catalogue; cards that are only available in English fall back to the Oshi Card API.
 
 ## Command
 
@@ -12,9 +12,9 @@ A Discord bot that looks up **Japanese-edition** hololive OFFICIAL CARD GAME car
 
 Add a rarity anywhere in an English name or card-number query to return only that printing, such as `UR shiori`, `ayame SEC`, or `hBP01-001 OSR`.
 
-The bot replies with the official Japanese card image and Japanese card information. English names are resolved through the official English catalogue, but the displayed card always comes from the Japanese catalogue. When available, the response also shows USD market and low-listing prices for the matching English printing, supplied by the [Oshi Card API](https://github.com/LarveyOfficial/oshicardapi). If a name matches multiple card numbers, or a card has multiple rarities/art variants, the response includes dropdowns for switching between them.
+The bot prefers the official Japanese card image and Japanese card information. English names are resolved through the official English catalogue. If no Japanese version matches, the bot displays the English-edition image and English rules data from the [Oshi Card API](https://github.com/LarveyOfficial/oshicardapi). When available, responses also show USD market and low-listing prices for the matching English printing. If a name matches multiple card numbers, or a card has multiple rarities/art variants, the response includes dropdowns for switching between them.
 
-The Japanese catalogue is the source of truth for card numbers, rarities, and images. The English catalogue is used only to resolve an English name to its Japanese name. Regional naming exceptions can be added to `data/name-aliases.json` without changing bot code.
+The Japanese catalogue remains the preferred source of truth. The English catalogue and Oshi Card API provide name resolution, English-only card details, images, and market prices. Regional naming exceptions can be added to `data/name-aliases.json` without changing bot code.
 
 ## Setup
 

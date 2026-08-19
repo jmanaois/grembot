@@ -1,4 +1,4 @@
-import { SITE_ORIGIN } from "./card-site.js";
+import { ENGLISH_SITE_ORIGIN, SITE_ORIGIN } from "./card-site.js";
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const MAX_CACHE_BYTES = 64 * 1024 * 1024;
@@ -11,6 +11,10 @@ const CONTENT_TYPE_EXTENSIONS = new Map([
 ]);
 const imageCache = new Map();
 let cachedBytes = 0;
+const ALLOWED_IMAGE_HOSTS = new Set([
+  new URL(SITE_ORIGIN).hostname,
+  new URL(ENGLISH_SITE_ORIGIN).hostname
+]);
 
 export class CardImageError extends Error {}
 
@@ -39,9 +43,9 @@ function cacheImage(url, image) {
 }
 
 async function downloadImage(url) {
-  const expectedHost = new URL(SITE_ORIGIN).hostname;
   const parsedUrl = new URL(url);
-  if (parsedUrl.hostname !== expectedHost) throw new CardImageError("Refused an image from an unexpected host.");
+  const expectedHost = parsedUrl.hostname;
+  if (!ALLOWED_IMAGE_HOSTS.has(expectedHost)) throw new CardImageError("Refused an image from an unexpected host.");
 
   const response = await fetch(parsedUrl, {
     headers: {

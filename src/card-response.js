@@ -48,18 +48,18 @@ function buildEnglishPricingField(pricing) {
 
 export function buildCardEmbed(card, variantIndex, variantCount, imageUrl = card.imageUrl, englishPricing = null) {
   const summary = Object.entries(card.metadata)
-    .filter(([key]) => !["レアリティ", "収録商品"].includes(key))
+    .filter(([key]) => !["レアリティ", "収録商品", "Rarity", "Set"].includes(key))
     .map(([key, value]) => `**${key}:** ${value}`)
     .join("\n");
 
   const embed = new EmbedBuilder()
     .setColor(EMBED_COLOR)
     .setTitle(`${card.number} — ${card.name} [${card.rarity}]`)
-    .setURL(card.detailUrl)
-    .setImage(imageUrl)
     .setFooter({
-      text: `hololive OCG • ${variantIndex + 1}/${variantCount} version${variantCount === 1 ? "" : "s"}`
+      text: `hololive OCG • ${card.edition === "english" ? "English" : "Japanese"} edition • ${variantIndex + 1}/${variantCount} version${variantCount === 1 ? "" : "s"}`
     });
+  if (card.detailUrl) embed.setURL(card.detailUrl);
+  if (imageUrl) embed.setImage(imageUrl);
 
   let characterBudget = 5_500 - card.number.length - card.name.length;
   const addFieldWithinBudget = (field) => {
@@ -70,8 +70,9 @@ export function buildCardEmbed(card, variantIndex, variantCount, imageUrl = card
   };
 
   if (summary) addFieldWithinBudget({ name: "Card information", value: summary, inline: true });
-  if (card.metadata["収録商品"]) {
-    addFieldWithinBudget({ name: "Card set", value: card.metadata["収録商品"], inline: true });
+  const cardSets = card.metadata["収録商品"] ?? card.metadata.Set ?? card.setNames?.join("\n");
+  if (cardSets) {
+    addFieldWithinBudget({ name: "Card set", value: cardSets, inline: true });
   }
   const pricingField = buildEnglishPricingField(englishPricing);
   if (pricingField) addFieldWithinBudget(pricingField);

@@ -49,6 +49,25 @@ test("adds clearly labeled English-printing market prices when available", () =>
   assert.match(priceField.value, /Oshi Card API/);
 });
 
+test("labels English-edition cards and displays their English set", () => {
+  const englishCard = {
+    ...card,
+    name: "Amane Kanata",
+    edition: "english",
+    setNames: ["Booster Pack – Blooming Radiance"],
+    metadata: { "Card type": "Oshi", Color: "White" },
+    sections: [{ name: "Oshi Skill — Test", value: "An English effect." }]
+  };
+  const message = buildCardMessage([englishCard]);
+
+  assert.match(message.embeds[0].data.footer.text, /English edition/);
+  assert.equal(
+    message.embeds[0].data.fields.find(field => field.name === "Card set").value,
+    "Booster Pack – Blooming Radiance"
+  );
+  assert.equal(message.embeds[0].data.fields.at(-1).name, "Oshi Skill — Test");
+});
+
 test("builds an English-name search-result selector", () => {
   const rows = buildSearchResultComponents([
     { number: "hBP01-001", name: "Amane Kanata", rarities: ["OSR", "OUR"] },
