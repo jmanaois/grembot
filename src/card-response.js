@@ -24,7 +24,7 @@ export function buildCardEmbed(card, variantIndex, variantCount) {
     .setURL(card.detailUrl)
     .setImage(card.imageUrl)
     .setFooter({
-      text: `Japanese card catalogue • ${variantIndex + 1}/${variantCount} printing${variantCount === 1 ? "" : "s"}`
+      text: `hololive OCG • ${variantIndex + 1}/${variantCount} version${variantCount === 1 ? "" : "s"}`
     });
 
   let characterBudget = 5_500 - card.number.length - card.name.length;
