@@ -1,0 +1,44 @@
+# Grembot
+
+A Discord bot that looks up **Japanese-edition** hololive OFFICIAL CARD GAME cards by card number. It reads the public Japanese card catalogue live, so newly published cards do not require a bot update.
+
+## Command
+
+`/card id:hBP01-001`
+
+The bot replies with the official Japanese card image and Japanese card information. If the card number has multiple rarities/art variants, the response includes a dropdown for switching between them.
+
+## Setup
+
+1. Install [Node.js 20.12 or newer](https://nodejs.org/).
+2. In the [Discord Developer Portal](https://discord.com/developers/applications), create an application and bot.
+3. Copy `.env.example` to `.env`, then fill in:
+   - `DISCORD_TOKEN`: token from the Bot page.
+   - `CLIENT_ID`: application ID from General Information.
+   - `GUILD_ID`: optional development server ID. Guild commands update immediately; global commands can take longer to appear.
+4. Install and register the command:
+
+   ```powershell
+   npm install
+   npm run deploy-commands
+   ```
+
+5. On **OAuth2 > URL Generator**, select `bot` and `applications.commands`. Grant at least **View Channels**, **Send Messages**, **Embed Links**, and **Use Application Commands**, then use the generated URL to invite the bot.
+6. Start it:
+
+   ```powershell
+   npm start
+   ```
+
+## Notes
+
+- Requests are restricted to `https://hololive-official-cardgame.com`; the English catalogue is never queried.
+- Results are cached in memory for 15 minutes to reduce load on the official site.
+- The bot links back to the official detail page and does not download or redistribute an image archive.
+- This project is unofficial. Card images and card data belong to their respective rights holders; review COVER's terms before operating a public or commercial bot.
+
+## Test
+
+```powershell
+npm test
+```
