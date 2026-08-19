@@ -8,12 +8,45 @@ import {
 
 const EMBED_COLOR = 0x2bb9f3;
 const MAX_FIELD_VALUE = 1024;
+const OSHI_CARD_API_URL = "https://github.com/LarveyOfficial/oshicardapi";
 
 function truncate(value, max = MAX_FIELD_VALUE) {
   return value.length <= max ? value : `${value.slice(0, max - 1)}…`;
 }
 
-export function buildCardEmbed(card, variantIndex, variantCount, imageUrl = card.imageUrl) {
+function formatUsd(value) {
+  if (!Number.isFinite(value)) return null;
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD"
+  }).format(value);
+}
+
+function buildEnglishPricingField(pricing) {
+  if (!pricing) return null;
+  const lines = [];
+  const marketPrice = formatUsd(pricing.marketPrice);
+  const lowPrice = formatUsd(pricing.lowPrice);
+  if (marketPrice) lines.push(`**Market:** ${marketPrice}`);
+  if (lowPrice) lines.push(`**Low listing:** ${lowPrice}`);
+  if (!marketPrice && !lowPrice) {
+    const midPrice = formatUsd(pricing.midPrice);
+    const directLowPrice = formatUsd(pricing.directLowPrice);
+    const highPrice = formatUsd(pricing.highPrice);
+    if (midPrice) lines.push(`**Mid:** ${midPrice}`);
+    else if (directLowPrice) lines.push(`**Direct low:** ${directLowPrice}`);
+    else if (highPrice) lines.push(`**High listing:** ${highPrice}`);
+  }
+
+  const updatedAt = Date.parse(pricing.updatedAt);
+  if (Number.isFinite(updatedAt)) {
+    lines.push(`Updated <t:${Math.floor(updatedAt / 1000)}:d>`);
+  }
+  lines.push(`[Data via Oshi Card API](${OSHI_CARD_API_URL})`);
+  return { name: "English market price (USD)", value: lines.join("\n"), inline: true };
+}
+
+export function buildCardEmbed(card, variantIndex, variantCount, imageUrl = card.imageUrl, englishPricing = null) {
   const summary = Object.entries(card.metadata)
     .filter(([key]) => !["レアリティ", "収録商品"].includes(key))
     .map(([key, value]) => `**${key}:** ${value}`)
@@ -40,6 +73,8 @@ export function buildCardEmbed(card, variantIndex, variantCount, imageUrl = card
   if (card.metadata["収録商品"]) {
     addFieldWithinBudget({ name: "Card set", value: card.metadata["収録商品"], inline: true });
   }
+  const pricingField = buildEnglishPricingField(englishPricing);
+  if (pricingField) addFieldWithinBudget(pricingField);
   for (const section of card.sections.slice(0, 20)) {
     addFieldWithinBudget({ name: truncate(section.name, 256), value: section.value });
   }
@@ -80,14 +115,15 @@ export function buildSearchResultComponents(results, selectedNumber, requestedRa
   return [new ActionRowBuilder().addComponents(menu)];
 }
 
-export function buildCardMessage(cards, selectedIndex = 0, imageFile = null) {
+export function buildCardMessage(cards, selectedIndex = 0, imageFile = null, englishPricing = null) {
   const safeIndex = Math.min(Math.max(selectedIndex, 0), cards.length - 1);
   const payload = {
     embeds: [buildCardEmbed(
       cards[safeIndex],
       safeIndex,
       cards.length,
-      imageFile ? `attachment://${imageFile.name}` : cards[safeIndex].imageUrl
+      imageFile ? `attachment://${imageFile.name}` : cards[safeIndex].imageUrl,
+      englishPricing
     )],
     components: buildVariantComponents(cards, safeIndex),
     attachments: []

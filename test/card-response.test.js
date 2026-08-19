@@ -35,6 +35,20 @@ test("can use a Discord attachment instead of a remote image URL", () => {
   assert.deepEqual(message.attachments, []);
 });
 
+test("adds clearly labeled English-printing market prices when available", () => {
+  const message = buildCardMessage([card], 0, null, {
+    updatedAt: "2026-08-18T20:05:08+0000",
+    marketPrice: 15.52,
+    lowPrice: 17.99
+  });
+  const priceField = message.embeds[0].data.fields.find(field => field.name === "English market price (USD)");
+
+  assert.match(priceField.value, /\*\*Market:\*\* \$15\.52/);
+  assert.match(priceField.value, /\*\*Low listing:\*\* \$17\.99/);
+  assert.match(priceField.value, /<t:\d+:d>/);
+  assert.match(priceField.value, /Oshi Card API/);
+});
+
 test("builds an English-name search-result selector", () => {
   const rows = buildSearchResultComponents([
     { number: "hBP01-001", name: "Amane Kanata", rarities: ["OSR", "OUR"] },

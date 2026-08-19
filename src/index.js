@@ -3,6 +3,7 @@ import { Client, Events, GatewayIntentBits, MessageFlags, PermissionFlagsBits } 
 import { findJapaneseCards, resolveCardQuery, CardSiteError } from "./card-site.js";
 import { buildCardMessage, buildSearchResultComponents } from "./card-response.js";
 import { getCardImageFile } from "./card-image.js";
+import { getEnglishCardPricing } from "./oshi-card-api.js";
 
 if (!process.env.DISCORD_TOKEN) {
   throw new Error("DISCORD_TOKEN must be set. Copy .env.example to .env.");
@@ -31,15 +32,20 @@ client.on(Events.InteractionCreate, async interaction => {
       let selectedVariant = 0;
       const canAttachFiles = interaction.appPermissions?.has(PermissionFlagsBits.AttachFiles) ?? false;
       const currentMessage = async () => {
-        let imageFile = null;
-        if (canAttachFiles) {
-          try {
-            imageFile = await getCardImageFile(cards[selectedVariant]);
-          } catch (error) {
-            console.warn(`Could not attach ${cards[selectedVariant].imageUrl}; using the remote image URL.`, error);
-          }
-        }
-        const cardMessage = buildCardMessage(cards, selectedVariant, imageFile);
+        const selectedCard = cards[selectedVariant];
+        const imagePromise = canAttachFiles
+          ? getCardImageFile(selectedCard).catch(error => {
+            console.warn(`Could not attach ${selectedCard.imageUrl}; using the remote image URL.`, error);
+            return null;
+          })
+          : Promise.resolve(null);
+        const pricingPromise = getEnglishCardPricing(selectedCard.number, selectedCard.rarity)
+          .catch(error => {
+            console.warn(`Could not load English pricing for ${selectedCard.number} [${selectedCard.rarity}].`, error);
+            return null;
+          });
+        const [imageFile, englishPricing] = await Promise.all([imagePromise, pricingPromise]);
+        const cardMessage = buildCardMessage(cards, selectedVariant, imageFile, englishPricing);
         return {
           ...cardMessage,
           components: [
