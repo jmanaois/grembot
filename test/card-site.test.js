@@ -63,8 +63,11 @@ test("ranks exact English-name matches and removes duplicate printings", () => {
   ]);
 });
 
-test("splits a trailing rarity from a name or card ID", () => {
+test("extracts a standalone rarity from anywhere in a name or card ID", () => {
   assert.deepEqual(parseCardQuery("  ayame   sec "), { lookupQuery: "ayame", rarity: "SEC" });
+  assert.deepEqual(parseCardQuery("UR shiori"), { lookupQuery: "shiori", rarity: "UR" });
+  assert.deepEqual(parseCardQuery("Shiori ur Novella"), { lookupQuery: "Shiori Novella", rarity: "UR" });
   assert.deepEqual(parseCardQuery("hBP01-001 osr"), { lookupQuery: "hBP01-001", rarity: "OSR" });
   assert.deepEqual(parseCardQuery("Amane Kanata"), { lookupQuery: "Amane Kanata", rarity: null });
+  assert.deepEqual(parseCardQuery("IRyS"), { lookupQuery: "IRyS", rarity: null });
 });

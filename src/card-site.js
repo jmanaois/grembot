@@ -25,14 +25,15 @@ export function normalizeCardId(value) {
 
 export function parseCardQuery(value) {
   const normalized = value.trim().replace(/\s+/g, " ");
-  const separatorIndex = normalized.lastIndexOf(" ");
-  if (separatorIndex === -1) return { lookupQuery: normalized, rarity: null };
+  const tokens = normalized ? normalized.split(" ") : [];
+  const rarityIndex = tokens.findIndex(token => CARD_RARITIES.has(token.toUpperCase()));
+  if (rarityIndex === -1) return { lookupQuery: normalized, rarity: null };
 
-  const possibleRarity = normalized.slice(separatorIndex + 1).toUpperCase();
-  if (!CARD_RARITIES.has(possibleRarity)) return { lookupQuery: normalized, rarity: null };
+  const rarity = tokens[rarityIndex].toUpperCase();
+  tokens.splice(rarityIndex, 1);
   return {
-    lookupQuery: normalized.slice(0, separatorIndex).trim(),
-    rarity: possibleRarity
+    lookupQuery: tokens.join(" "),
+    rarity
   };
 }
 
@@ -233,6 +234,9 @@ export async function searchJapaneseCardsByName(name, rarity = null) {
 
 export async function resolveCardQuery(query) {
   const { lookupQuery, rarity } = parseCardQuery(query);
+  if (!lookupQuery) {
+    throw new CardSiteError("Include a card number or English card name with the rarity.");
+  }
   const filterRarity = cards => rarity
     ? cards.filter(card => card.rarity.toUpperCase() === rarity)
     : cards;
