@@ -40,9 +40,9 @@ The Japanese catalogue is the source of truth for card numbers, rarities, and im
 
 ## Notes
 
-- Requests are restricted to `https://hololive-official-cardgame.com`; the English catalogue is never queried.
+- Card data and images come from `https://hololive-official-cardgame.com`; the English catalogue is used only for name resolution when an alias is unavailable.
 - Results are cached in memory for 15 minutes to reduce load on the official site.
-- The bot links back to the official detail page and does not download or redistribute an image archive.
+- Card images are downloaded on demand, cached temporarily in memory, and attached to Discord messages so embeds do not depend on remote image proxying. The official URL is used as a fallback.
 - This project is unofficial. Card images and card data belong to their respective rights holders; review COVER's terms before operating a public or commercial bot.
 
 ## Test

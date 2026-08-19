@@ -2,6 +2,7 @@ import "dotenv/config";
 import { Client, Events, GatewayIntentBits, MessageFlags } from "discord.js";
 import { findJapaneseCards, resolveCardQuery, CardSiteError } from "./card-site.js";
 import { buildCardMessage, buildSearchResultComponents } from "./card-response.js";
+import { getCardImageFile } from "./card-image.js";
 
 if (!process.env.DISCORD_TOKEN) {
   throw new Error("DISCORD_TOKEN must be set. Copy .env.example to .env.");
@@ -28,8 +29,14 @@ client.on(Events.InteractionCreate, async interaction => {
       }
 
       let selectedVariant = 0;
-      const currentMessage = () => {
-        const cardMessage = buildCardMessage(cards, selectedVariant);
+      const currentMessage = async () => {
+        let imageFile = null;
+        try {
+          imageFile = await getCardImageFile(cards[selectedVariant]);
+        } catch (error) {
+          console.warn(`Could not attach ${cards[selectedVariant].imageUrl}; using the remote image URL.`, error);
+        }
+        const cardMessage = buildCardMessage(cards, selectedVariant, imageFile);
         return {
           ...cardMessage,
           components: [
@@ -39,7 +46,7 @@ client.on(Events.InteractionCreate, async interaction => {
         };
       };
 
-      const message = await interaction.editReply(currentMessage());
+      const message = await interaction.editReply(await currentMessage());
       if (cards.length < 2 && searchResults.length < 2) return;
 
       const collector = message.createMessageComponentCollector({ time: 10 * 60 * 1000 });
@@ -54,7 +61,8 @@ client.on(Events.InteractionCreate, async interaction => {
         }
         if (componentInteraction.customId === "card-variant") {
           selectedVariant = Number.parseInt(componentInteraction.values[0], 10);
-          await componentInteraction.update(currentMessage());
+          await componentInteraction.deferUpdate();
+          await interaction.editReply(await currentMessage());
           return;
         }
 
@@ -73,7 +81,7 @@ client.on(Events.InteractionCreate, async interaction => {
           }
           cards = selectedCards;
           selectedVariant = 0;
-          await interaction.editReply(currentMessage());
+          await interaction.editReply(await currentMessage());
         } catch (error) {
           console.error(error);
           await interaction.followUp({

@@ -1,5 +1,6 @@
 import {
   ActionRowBuilder,
+  AttachmentBuilder,
   EmbedBuilder,
   StringSelectMenuBuilder,
   StringSelectMenuOptionBuilder
@@ -12,7 +13,7 @@ function truncate(value, max = MAX_FIELD_VALUE) {
   return value.length <= max ? value : `${value.slice(0, max - 1)}…`;
 }
 
-export function buildCardEmbed(card, variantIndex, variantCount) {
+export function buildCardEmbed(card, variantIndex, variantCount, imageUrl = card.imageUrl) {
   const summary = Object.entries(card.metadata)
     .filter(([key]) => !["レアリティ", "収録商品"].includes(key))
     .map(([key, value]) => `**${key}:** ${value}`)
@@ -22,7 +23,7 @@ export function buildCardEmbed(card, variantIndex, variantCount) {
     .setColor(EMBED_COLOR)
     .setTitle(`${card.number} — ${card.name} [${card.rarity}]`)
     .setURL(card.detailUrl)
-    .setImage(card.imageUrl)
+    .setImage(imageUrl)
     .setFooter({
       text: `hololive OCG • ${variantIndex + 1}/${variantCount} version${variantCount === 1 ? "" : "s"}`
     });
@@ -79,10 +80,20 @@ export function buildSearchResultComponents(results, selectedNumber, requestedRa
   return [new ActionRowBuilder().addComponents(menu)];
 }
 
-export function buildCardMessage(cards, selectedIndex = 0) {
+export function buildCardMessage(cards, selectedIndex = 0, imageFile = null) {
   const safeIndex = Math.min(Math.max(selectedIndex, 0), cards.length - 1);
-  return {
-    embeds: [buildCardEmbed(cards[safeIndex], safeIndex, cards.length)],
-    components: buildVariantComponents(cards, safeIndex)
+  const payload = {
+    embeds: [buildCardEmbed(
+      cards[safeIndex],
+      safeIndex,
+      cards.length,
+      imageFile ? `attachment://${imageFile.name}` : cards[safeIndex].imageUrl
+    )],
+    components: buildVariantComponents(cards, safeIndex),
+    attachments: []
   };
+  if (imageFile) {
+    payload.files = [new AttachmentBuilder(imageFile.data, { name: imageFile.name })];
+  }
+  return payload;
 }

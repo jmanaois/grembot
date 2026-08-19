@@ -28,6 +28,13 @@ test("builds an image embed and only adds a selector for multiple printings", ()
   assert.equal(multiple.components[0].components[0].data.placeholder, "Choose another rarity / artwork");
 });
 
+test("can use a Discord attachment instead of a remote image URL", () => {
+  const message = buildCardMessage([card], 0, { data: Buffer.from("image"), name: "card-22-osr.png" });
+  assert.equal(message.embeds[0].data.image.url, "attachment://card-22-osr.png");
+  assert.equal(message.files[0].name, "card-22-osr.png");
+  assert.deepEqual(message.attachments, []);
+});
+
 test("builds an English-name search-result selector", () => {
   const rows = buildSearchResultComponents([
     { number: "hBP01-001", name: "Amane Kanata", rarities: ["OSR", "OUR"] },
