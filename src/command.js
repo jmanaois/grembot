@@ -2,9 +2,10 @@ import { SlashCommandBuilder } from "discord.js";
 
 export const cardCommand = new SlashCommandBuilder()
   .setName("card")
-  .setDescription("日本語版ホロカをカード番号で検索します")
+  .setDescription("日本語版ホロカをカード番号または英語名で検索します")
   .addStringOption(option => option
-    .setName("id")
-    .setDescription("カード番号（例: hBP01-001）")
+    .setName("query")
+    .setDescription("カード番号または英語名（例: hBP01-001 / Amane Kanata）")
     .setRequired(true)
-    .setMaxLength(32));
+    .setMinLength(2)
+    .setMaxLength(100));

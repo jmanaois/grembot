@@ -62,6 +62,22 @@ export function buildVariantComponents(cards, selectedIndex = 0) {
   return [new ActionRowBuilder().addComponents(menu)];
 }
 
+export function buildSearchResultComponents(results, selectedNumber) {
+  if (results.length < 2) return [];
+
+  const menu = new StringSelectMenuBuilder()
+    .setCustomId("card-result")
+    .setPlaceholder("英語名の検索結果からカードを選択")
+    .addOptions(results.slice(0, 25).map(result =>
+      new StringSelectMenuOptionBuilder()
+        .setLabel(`${result.name} — ${result.number}`.slice(0, 100))
+        .setValue(result.number)
+        .setDefault(result.number.toLowerCase() === selectedNumber.toLowerCase())
+    ));
+
+  return [new ActionRowBuilder().addComponents(menu)];
+}
+
 export function buildCardMessage(cards, selectedIndex = 0) {
   const safeIndex = Math.min(Math.max(selectedIndex, 0), cards.length - 1);
   return {

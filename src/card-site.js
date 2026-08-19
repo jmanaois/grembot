@@ -1,9 +1,12 @@
 import * as cheerio from "cheerio";
 
 export const SITE_ORIGIN = "https://hololive-official-cardgame.com";
+export const ENGLISH_SITE_ORIGIN = "https://en.hololive-official-cardgame.com";
 const SEARCH_URL = `${SITE_ORIGIN}/cardlist/cardsearch/`;
+const ENGLISH_SEARCH_URL = `${ENGLISH_SITE_ORIGIN}/cardlist/cardsearch/`;
 const CACHE_TTL_MS = 15 * 60 * 1000;
 const cache = new Map();
+const englishCache = new Map();
 
 export class CardSiteError extends Error {}
 
@@ -76,7 +79,29 @@ export function parseSearchResults(html, requestedCardId) {
   return cards;
 }
 
-async function fetchJapaneseHtml(url) {
+export function parseEnglishSearchResults(html, query) {
+  const $ = cheerio.load(html);
+  const normalizedQuery = query.trim().toLowerCase();
+  const uniqueCards = new Map();
+
+  $(".cardlist-Result_List_Txt > li").each((_, listItem) => {
+    const item = $(listItem);
+    const number = cleanText(item.find(".number").first());
+    const name = cleanText(item.find(".name").first());
+    if (!number || !name || !name.toLowerCase().includes(normalizedQuery)) return;
+    if (!uniqueCards.has(number.toLowerCase())) uniqueCards.set(number.toLowerCase(), { number, name });
+  });
+
+  return [...uniqueCards.values()]
+    .sort((left, right) => {
+      const leftExact = left.name.toLowerCase() === normalizedQuery ? 0 : 1;
+      const rightExact = right.name.toLowerCase() === normalizedQuery ? 0 : 1;
+      return leftExact - rightExact || left.name.localeCompare(right.name) || left.number.localeCompare(right.number);
+    })
+    .slice(0, 25);
+}
+
+async function fetchCatalogueHtml(url, expectedOrigin) {
   const response = await fetch(url, {
     headers: {
       Accept: "text/html,application/xhtml+xml",
@@ -86,8 +111,8 @@ async function fetchJapaneseHtml(url) {
   });
 
   if (!response.ok) throw new CardSiteError(`The card catalogue returned HTTP ${response.status}.`);
-  if (new URL(response.url).hostname !== new URL(SITE_ORIGIN).hostname) {
-    throw new CardSiteError("The Japanese catalogue redirected to an unexpected host.");
+  if (new URL(response.url).hostname !== new URL(expectedOrigin).hostname) {
+    throw new CardSiteError("The card catalogue redirected to an unexpected host.");
   }
   return response.text();
 }
@@ -106,7 +131,44 @@ export async function findJapaneseCards(cardId) {
   url.searchParams.set("keyword", normalized);
   url.searchParams.set("view", "text");
   url.searchParams.set("sort", "no");
-  const cards = parseSearchResults(await fetchJapaneseHtml(url), normalized);
+  const cards = parseSearchResults(await fetchCatalogueHtml(url, SITE_ORIGIN), normalized);
   cache.set(key, { cards, expiresAt: Date.now() + CACHE_TTL_MS });
   return cards;
+}
+
+export async function searchEnglishCardNames(query) {
+  const normalized = query.trim();
+  if (normalized.length < 2 || normalized.length > 100) {
+    throw new CardSiteError("English card-name searches must be between 2 and 100 characters.");
+  }
+
+  const key = normalized.toLowerCase();
+  const cached = englishCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.results;
+
+  const url = new URL(ENGLISH_SEARCH_URL);
+  url.searchParams.set("keyword", normalized);
+  url.searchParams.set("view", "text");
+  url.searchParams.set("sort", "no");
+  const results = parseEnglishSearchResults(
+    await fetchCatalogueHtml(url, ENGLISH_SITE_ORIGIN),
+    normalized
+  );
+  englishCache.set(key, { results, expiresAt: Date.now() + CACHE_TTL_MS });
+  return results;
+}
+
+export async function resolveCardQuery(query) {
+  const normalized = query.trim();
+  if (/^[A-Za-z0-9-]{3,32}$/.test(normalized)) {
+    const directCards = await findJapaneseCards(normalized);
+    if (directCards.length > 0) return { cards: directCards, searchResults: [] };
+  }
+
+  const searchResults = await searchEnglishCardNames(normalized);
+  for (const result of searchResults) {
+    const cards = await findJapaneseCards(result.number);
+    if (cards.length > 0) return { cards, searchResults };
+  }
+  return { cards: [], searchResults };
 }

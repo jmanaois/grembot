@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildCardMessage } from "../src/card-response.js";
+import { buildCardMessage, buildSearchResultComponents } from "../src/card-response.js";
 
 const card = {
   siteId: "22",
@@ -22,4 +22,13 @@ test("builds an image embed and only adds a selector for multiple printings", ()
   assert.equal(multiple.components.length, 1);
   assert.equal(multiple.components[0].components[0].options.length, 2);
   assert.equal(multiple.components[0].components[0].options[1].data.default, true);
+});
+
+test("builds an English-name search-result selector", () => {
+  const rows = buildSearchResultComponents([
+    { number: "hBP01-001", name: "Amane Kanata" },
+    { number: "hBP01-009", name: "Amane Kanata" }
+  ], "hBP01-009");
+  assert.equal(rows[0].components[0].data.custom_id, "card-result");
+  assert.equal(rows[0].components[0].options[1].data.default, true);
 });

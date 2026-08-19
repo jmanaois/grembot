@@ -4,9 +4,11 @@ A Discord bot that looks up **Japanese-edition** hololive OFFICIAL CARD GAME car
 
 ## Command
 
-`/card id:hBP01-001`
+`/card query:hBP01-001`
 
-The bot replies with the official Japanese card image and Japanese card information. If the card number has multiple rarities/art variants, the response includes a dropdown for switching between them.
+`/card query:Amane Kanata`
+
+The bot replies with the official Japanese card image and Japanese card information. English names are resolved through the official English catalogue, but the displayed card always comes from the Japanese catalogue. If a name matches multiple card numbers, or a card has multiple rarities/art variants, the response includes dropdowns for switching between them.
 
 ## Setup
 
