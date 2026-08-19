@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { parseEnglishSearchResults, parseSearchResults } from "../src/card-site.js";
+import { parseCardQuery, parseEnglishSearchResults, parseJapaneseCards, parseSearchResults } from "../src/card-site.js";
 
 const fixture = `
 <ul class="cardlist-Result_List_Txt">
@@ -43,18 +43,28 @@ test("parses only exact Japanese card-number matches", () => {
   });
 });
 
+test("can parse an unfiltered Japanese rarity result list", () => {
+  assert.equal(parseJapaneseCards(fixture).length, 1);
+});
+
 test("ranks exact English-name matches and removes duplicate printings", () => {
   const englishFixture = `
     <ul class="cardlist-Result_List_Txt">
-      <li><p class="number">hBP02-078</p><p class="name">Kanata Construction</p></li>
-      <li><p class="number">hBP01-001</p><p class="name">Amane Kanata</p></li>
-      <li><p class="number">hBP01-001</p><p class="name">Amane Kanata</p></li>
-      <li><p class="number">hBP01-009</p><p class="name">Amane Kanata</p></li>
-      <li><p class="number">hBP01-116</p><p class="name">Upao</p></li>
+      <li><p class="number">hBP02-078</p><p class="name">Kanata Construction</p><div class="info"><dt>Rarity</dt><dd>U</dd></div></li>
+      <li><p class="number">hBP01-001</p><p class="name">Amane Kanata</p><div class="info"><dt>Rarity</dt><dd>OSR</dd></div></li>
+      <li><p class="number">hBP01-001</p><p class="name">Amane Kanata</p><div class="info"><dt>Rarity</dt><dd>OUR</dd></div></li>
+      <li><p class="number">hBP01-009</p><p class="name">Amane Kanata</p><div class="info"><dt>Rarity</dt><dd>C</dd></div></li>
+      <li><p class="number">hBP01-116</p><p class="name">Upao</p><div class="info"><dt>Rarity</dt><dd>U</dd></div></li>
     </ul>`;
 
   assert.deepEqual(parseEnglishSearchResults(englishFixture, "Amane Kanata"), [
-    { number: "hBP01-001", name: "Amane Kanata" },
-    { number: "hBP01-009", name: "Amane Kanata" }
+    { number: "hBP01-001", name: "Amane Kanata", rarities: ["OSR", "OUR"] },
+    { number: "hBP01-009", name: "Amane Kanata", rarities: ["C"] }
   ]);
+});
+
+test("splits a trailing rarity from a name or card ID", () => {
+  assert.deepEqual(parseCardQuery("  ayame   sec "), { lookupQuery: "ayame", rarity: "SEC" });
+  assert.deepEqual(parseCardQuery("hBP01-001 osr"), { lookupQuery: "hBP01-001", rarity: "OSR" });
+  assert.deepEqual(parseCardQuery("Amane Kanata"), { lookupQuery: "Amane Kanata", rarity: null });
 });

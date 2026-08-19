@@ -20,7 +20,7 @@ export function buildCardEmbed(card, variantIndex, variantCount) {
 
   const embed = new EmbedBuilder()
     .setColor(EMBED_COLOR)
-    .setTitle(`${card.number} — ${card.name}`)
+    .setTitle(`${card.number} — ${card.name} [${card.rarity}]`)
     .setURL(card.detailUrl)
     .setImage(card.imageUrl)
     .setFooter({
@@ -62,18 +62,19 @@ export function buildVariantComponents(cards, selectedIndex = 0) {
   return [new ActionRowBuilder().addComponents(menu)];
 }
 
-export function buildSearchResultComponents(results, selectedNumber) {
+export function buildSearchResultComponents(results, selectedNumber, requestedRarity = null) {
   if (results.length < 2) return [];
 
   const menu = new StringSelectMenuBuilder()
     .setCustomId("card-result")
     .setPlaceholder("英語名の検索結果からカードを選択")
-    .addOptions(results.slice(0, 25).map(result =>
-      new StringSelectMenuOptionBuilder()
-        .setLabel(`${result.name} — ${result.number}`.slice(0, 100))
+    .addOptions(results.slice(0, 25).map(result => {
+      const displayedRarities = requestedRarity ?? result.rarities?.join("/");
+      return new StringSelectMenuOptionBuilder()
+        .setLabel(`${result.name} — ${result.number}${displayedRarities ? ` [${displayedRarities}]` : ""}`.slice(0, 100))
         .setValue(result.number)
-        .setDefault(result.number.toLowerCase() === selectedNumber.toLowerCase())
-    ));
+        .setDefault(result.number.toLowerCase() === selectedNumber.toLowerCase());
+    }));
 
   return [new ActionRowBuilder().addComponents(menu)];
 }

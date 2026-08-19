@@ -21,6 +21,7 @@ client.on(Events.InteractionCreate, async interaction => {
       const resolved = await resolveCardQuery(query);
       let cards = resolved.cards;
       const searchResults = resolved.searchResults;
+      const requestedRarity = resolved.rarity;
       if (cards.length === 0) {
         await interaction.editReply(`日本語版のカード「${query}」は見つかりませんでした。カード番号または英語名を確認してください。`);
         return;
@@ -32,7 +33,7 @@ client.on(Events.InteractionCreate, async interaction => {
         return {
           ...cardMessage,
           components: [
-            ...buildSearchResultComponents(searchResults, cards[0].number),
+            ...buildSearchResultComponents(searchResults, cards[0].number, requestedRarity),
             ...cardMessage.components
           ]
         };
@@ -59,7 +60,10 @@ client.on(Events.InteractionCreate, async interaction => {
 
         await componentInteraction.deferUpdate();
         try {
-          const selectedCards = await findJapaneseCards(componentInteraction.values[0]);
+          const allSelectedCards = await findJapaneseCards(componentInteraction.values[0]);
+          const selectedCards = requestedRarity
+            ? allSelectedCards.filter(card => card.rarity.toUpperCase() === requestedRarity)
+            : allSelectedCards;
           if (selectedCards.length === 0) {
             await interaction.followUp({
               content: "その英語版カード番号に対応する日本語版カードが見つかりませんでした。",

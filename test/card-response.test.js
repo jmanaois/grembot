@@ -26,9 +26,10 @@ test("builds an image embed and only adds a selector for multiple printings", ()
 
 test("builds an English-name search-result selector", () => {
   const rows = buildSearchResultComponents([
-    { number: "hBP01-001", name: "Amane Kanata" },
-    { number: "hBP01-009", name: "Amane Kanata" }
-  ], "hBP01-009");
+    { number: "hBP01-001", name: "Amane Kanata", rarities: ["OSR", "OUR"] },
+    { number: "hBP01-009", name: "Amane Kanata", rarities: ["C"] }
+  ], "hBP01-009", "OUR");
   assert.equal(rows[0].components[0].data.custom_id, "card-result");
   assert.equal(rows[0].components[0].options[1].data.default, true);
+  assert.match(rows[0].components[0].options[0].data.label, /\[OUR\]$/);
 });

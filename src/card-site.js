@@ -7,11 +7,29 @@ const ENGLISH_SEARCH_URL = `${ENGLISH_SITE_ORIGIN}/cardlist/cardsearch/`;
 const CACHE_TTL_MS = 15 * 60 * 1000;
 const cache = new Map();
 const englishCache = new Map();
+const japaneseRarityCache = new Map();
 
 export class CardSiteError extends Error {}
 
+export const CARD_RARITIES = new Set([
+  "RR", "R", "U", "C", "OSR", "OC", "SEC", "OUR", "HR", "UR", "SY", "SR", "S", "P"
+]);
+
 export function normalizeCardId(value) {
   return value.trim();
+}
+
+export function parseCardQuery(value) {
+  const normalized = value.trim().replace(/\s+/g, " ");
+  const separatorIndex = normalized.lastIndexOf(" ");
+  if (separatorIndex === -1) return { lookupQuery: normalized, rarity: null };
+
+  const possibleRarity = normalized.slice(separatorIndex + 1).toUpperCase();
+  if (!CARD_RARITIES.has(possibleRarity)) return { lookupQuery: normalized, rarity: null };
+  return {
+    lookupQuery: normalized.slice(0, separatorIndex).trim(),
+    rarity: possibleRarity
+  };
 }
 
 function cleanText(element) {
@@ -22,15 +40,14 @@ function absoluteUrl(path) {
   return new URL(path, SITE_ORIGIN).href;
 }
 
-export function parseSearchResults(html, requestedCardId) {
+export function parseJapaneseCards(html) {
   const $ = cheerio.load(html);
-  const wanted = normalizeCardId(requestedCardId).toLowerCase();
   const cards = [];
 
   $(".cardlist-Result_List_Txt > li").each((_, listItem) => {
     const item = $(listItem);
     const number = cleanText(item.find(".number").first());
-    if (number.toLowerCase() !== wanted) return;
+    if (!number) return;
 
     const link = item.find("a").first().attr("href");
     const image = item.find(".img img").first().attr("src");
@@ -79,6 +96,11 @@ export function parseSearchResults(html, requestedCardId) {
   return cards;
 }
 
+export function parseSearchResults(html, requestedCardId) {
+  const wanted = normalizeCardId(requestedCardId).toLowerCase();
+  return parseJapaneseCards(html).filter(card => card.number.toLowerCase() === wanted);
+}
+
 export function parseEnglishSearchResults(html, query) {
   const $ = cheerio.load(html);
   const normalizedQuery = query.trim().toLowerCase();
@@ -89,7 +111,16 @@ export function parseEnglishSearchResults(html, query) {
     const number = cleanText(item.find(".number").first());
     const name = cleanText(item.find(".name").first());
     if (!number || !name || !name.toLowerCase().includes(normalizedQuery)) return;
-    if (!uniqueCards.has(number.toLowerCase())) uniqueCards.set(number.toLowerCase(), { number, name });
+
+    let rarity = "";
+    item.find(".info dt").each((__, term) => {
+      if (cleanText($(term)).toLowerCase() === "rarity") rarity = cleanText($(term).next("dd"));
+    });
+
+    const key = number.toLowerCase();
+    if (!uniqueCards.has(key)) uniqueCards.set(key, { number, name, rarities: [] });
+    const result = uniqueCards.get(key);
+    if (rarity && !result.rarities.includes(rarity)) result.rarities.push(rarity);
   });
 
   return [...uniqueCards.values()]
@@ -158,17 +189,64 @@ export async function searchEnglishCardNames(query) {
   return results;
 }
 
+export async function searchJapaneseCardsByNameAndRarity(name, rarity) {
+  const normalizedName = name.trim();
+  const normalizedRarity = rarity.toUpperCase();
+  if (!normalizedName || !CARD_RARITIES.has(normalizedRarity)) return [];
+
+  const key = `${normalizedName.toLowerCase()}|${normalizedRarity}`;
+  const cached = japaneseRarityCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.cards;
+
+  const url = new URL(SEARCH_URL);
+  url.searchParams.set("keyword", normalizedName);
+  url.searchParams.set("rare[0]", normalizedRarity);
+  url.searchParams.set("view", "text");
+  url.searchParams.set("sort", "no");
+  const cards = parseJapaneseCards(await fetchCatalogueHtml(url, SITE_ORIGIN))
+    .filter(card => card.name === normalizedName && card.rarity.toUpperCase() === normalizedRarity);
+  japaneseRarityCache.set(key, { cards, expiresAt: Date.now() + CACHE_TTL_MS });
+  return cards;
+}
+
 export async function resolveCardQuery(query) {
-  const normalized = query.trim();
-  if (/^[A-Za-z0-9-]{3,32}$/.test(normalized)) {
-    const directCards = await findJapaneseCards(normalized);
-    if (directCards.length > 0) return { cards: directCards, searchResults: [] };
+  const { lookupQuery, rarity } = parseCardQuery(query);
+  const filterRarity = cards => rarity
+    ? cards.filter(card => card.rarity.toUpperCase() === rarity)
+    : cards;
+
+  if (/^[A-Za-z0-9-]{3,32}$/.test(lookupQuery)) {
+    const allDirectCards = await findJapaneseCards(lookupQuery);
+    if (allDirectCards.length > 0) {
+      return { cards: filterRarity(allDirectCards), searchResults: [], rarity };
+    }
   }
 
-  const searchResults = await searchEnglishCardNames(normalized);
-  for (const result of searchResults) {
-    const cards = await findJapaneseCards(result.number);
-    if (cards.length > 0) return { cards, searchResults };
+  const allSearchResults = await searchEnglishCardNames(lookupQuery);
+  if (!rarity) {
+    for (const result of allSearchResults) {
+      const cards = await findJapaneseCards(result.number);
+      if (cards.length > 0) return { cards, searchResults: allSearchResults, rarity };
+    }
+    return { cards: [], searchResults: allSearchResults, rarity };
   }
-  return { cards: [], searchResults };
+
+  for (const result of allSearchResults) {
+    const seedCards = await findJapaneseCards(result.number);
+    if (seedCards.length === 0) continue;
+
+    const rarityMatches = await searchJapaneseCardsByNameAndRarity(seedCards[0].name, rarity);
+    if (rarityMatches.length === 0) continue;
+
+    const matchingEnglishName = result.name;
+    const choices = [...new Set(rarityMatches.map(card => card.number))].map(number => ({
+      number,
+      name: matchingEnglishName,
+      rarities: [rarity]
+    }));
+    const cards = rarityMatches.filter(card => card.number === choices[0].number);
+    return { cards, searchResults: choices, rarity };
+  }
+
+  return { cards: [], searchResults: [], rarity };
 }
