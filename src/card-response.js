@@ -35,9 +35,9 @@ export function buildCardEmbed(card, variantIndex, variantCount) {
     characterBudget -= field.name.length + value.length;
   };
 
-  if (summary) addFieldWithinBudget({ name: "カード情報", value: summary, inline: true });
+  if (summary) addFieldWithinBudget({ name: "Card information", value: summary, inline: true });
   if (card.metadata["収録商品"]) {
-    addFieldWithinBudget({ name: "収録商品", value: card.metadata["収録商品"], inline: true });
+    addFieldWithinBudget({ name: "Card set", value: card.metadata["収録商品"], inline: true });
   }
   for (const section of card.sections.slice(0, 20)) {
     addFieldWithinBudget({ name: truncate(section.name, 256), value: section.value });
@@ -50,11 +50,11 @@ export function buildVariantComponents(cards, selectedIndex = 0) {
 
   const menu = new StringSelectMenuBuilder()
     .setCustomId("card-variant")
-    .setPlaceholder("別のレアリティ / 絵柄を選択")
+    .setPlaceholder("Choose another rarity / artwork")
     .addOptions(cards.slice(0, 25).map((card, index) =>
       new StringSelectMenuOptionBuilder()
         .setLabel(`${card.rarity} — ${card.number}`.slice(0, 100))
-        .setDescription(`絵柄 ${index + 1} / ${cards.length}`)
+        .setDescription(`Artwork ${index + 1} / ${cards.length}`)
         .setValue(String(index))
         .setDefault(index === selectedIndex)
     ));
@@ -67,7 +67,7 @@ export function buildSearchResultComponents(results, selectedNumber, requestedRa
 
   const menu = new StringSelectMenuBuilder()
     .setCustomId("card-result")
-    .setPlaceholder("英語名の検索結果からカードを選択")
+    .setPlaceholder("Choose a card from the search results")
     .addOptions(results.slice(0, 25).map(result => {
       const displayedRarities = requestedRarity ?? result.rarities?.join("/");
       return new StringSelectMenuOptionBuilder()

@@ -23,7 +23,7 @@ client.on(Events.InteractionCreate, async interaction => {
       const searchResults = resolved.searchResults;
       const requestedRarity = resolved.rarity;
       if (cards.length === 0) {
-        await interaction.editReply(`日本語版のカード「${query}」は見つかりませんでした。カード番号または英語名を確認してください。`);
+        await interaction.editReply(`No Japanese card matched “${query}”. Check the card number, English name, or rarity and try again.`);
         return;
       }
 
@@ -47,7 +47,7 @@ client.on(Events.InteractionCreate, async interaction => {
         if (!componentInteraction.isStringSelectMenu() || !["card-variant", "card-result"].includes(componentInteraction.customId)) return;
         if (componentInteraction.user.id !== interaction.user.id) {
           await componentInteraction.reply({
-            content: "このメニューはコマンドを実行したユーザーだけが操作できます。",
+            content: "Only the person who ran this command can use this menu.",
             flags: MessageFlags.Ephemeral
           });
           return;
@@ -66,7 +66,7 @@ client.on(Events.InteractionCreate, async interaction => {
             : allSelectedCards;
           if (selectedCards.length === 0) {
             await interaction.followUp({
-              content: "その英語版カード番号に対応する日本語版カードが見つかりませんでした。",
+              content: "No Japanese card matched that selection.",
               flags: MessageFlags.Ephemeral
             });
             return;
@@ -77,7 +77,7 @@ client.on(Events.InteractionCreate, async interaction => {
         } catch (error) {
           console.error(error);
           await interaction.followUp({
-            content: "カードの切り替え中にエラーが発生しました。もう一度 `/card` を実行してください。",
+            content: "Something went wrong while changing cards. Please run `/card` again.",
             flags: MessageFlags.Ephemeral
           }).catch(() => {});
         }
@@ -87,8 +87,8 @@ client.on(Events.InteractionCreate, async interaction => {
   } catch (error) {
     console.error(error);
     const message = error instanceof CardSiteError
-      ? `カードリストを検索できませんでした: ${error.message}`
-      : "カードの検索中にエラーが発生しました。しばらくしてからもう一度お試しください。";
+      ? `Could not search the card catalogue: ${error.message}`
+      : "Something went wrong while searching for that card. Please try again in a moment.";
     if (interaction.deferred || interaction.replied) await interaction.editReply({ content: message, embeds: [], components: [] }).catch(() => {});
     else await interaction.reply({ content: message, flags: MessageFlags.Ephemeral }).catch(() => {});
   }

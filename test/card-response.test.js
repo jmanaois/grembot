@@ -16,12 +16,16 @@ const card = {
 test("builds an image embed and only adds a selector for multiple printings", () => {
   const single = buildCardMessage([card]);
   assert.equal(single.embeds[0].data.image.url, card.imageUrl);
+  assert.deepEqual(single.embeds[0].data.fields.map(field => field.name), [
+    "Card information", "Card set", "推しスキル"
+  ]);
   assert.equal(single.components.length, 0);
 
   const multiple = buildCardMessage([card, { ...card, siteId: "23", rarity: "OUR" }], 1);
   assert.equal(multiple.components.length, 1);
   assert.equal(multiple.components[0].components[0].options.length, 2);
   assert.equal(multiple.components[0].components[0].options[1].data.default, true);
+  assert.equal(multiple.components[0].components[0].data.placeholder, "Choose another rarity / artwork");
 });
 
 test("builds an English-name search-result selector", () => {

@@ -91,7 +91,7 @@ export function parseJapaneseCards(html) {
       name: cleanText(item.find(".name").first()),
       imageUrl: absoluteUrl(image),
       detailUrl: absoluteUrl(`/cardlist/?id=${siteId}`),
-      rarity: metadata["レアリティ"] ?? "不明",
+      rarity: metadata["レアリティ"] ?? "Unknown",
       metadata,
       sections
     });
