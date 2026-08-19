@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { Client, Events, GatewayIntentBits, MessageFlags } from "discord.js";
+import { Client, Events, GatewayIntentBits, MessageFlags, PermissionFlagsBits } from "discord.js";
 import { findJapaneseCards, resolveCardQuery, CardSiteError } from "./card-site.js";
 import { buildCardMessage, buildSearchResultComponents } from "./card-response.js";
 import { getCardImageFile } from "./card-image.js";
@@ -29,12 +29,15 @@ client.on(Events.InteractionCreate, async interaction => {
       }
 
       let selectedVariant = 0;
+      const canAttachFiles = interaction.appPermissions?.has(PermissionFlagsBits.AttachFiles) ?? false;
       const currentMessage = async () => {
         let imageFile = null;
-        try {
-          imageFile = await getCardImageFile(cards[selectedVariant]);
-        } catch (error) {
-          console.warn(`Could not attach ${cards[selectedVariant].imageUrl}; using the remote image URL.`, error);
+        if (canAttachFiles) {
+          try {
+            imageFile = await getCardImageFile(cards[selectedVariant]);
+          } catch (error) {
+            console.warn(`Could not attach ${cards[selectedVariant].imageUrl}; using the remote image URL.`, error);
+          }
         }
         const cardMessage = buildCardMessage(cards, selectedVariant, imageFile);
         return {

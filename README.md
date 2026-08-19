@@ -31,7 +31,7 @@ The Japanese catalogue is the source of truth for card numbers, rarities, and im
    npm run deploy-commands
    ```
 
-5. On **OAuth2 > URL Generator**, select `bot` and `applications.commands`. Grant at least **View Channels**, **Send Messages**, **Embed Links**, and **Use Application Commands**, then use the generated URL to invite the bot.
+5. On **OAuth2 > URL Generator**, select `bot` and `applications.commands`. Grant at least **View Channels**, **Send Messages**, **Embed Links**, **Attach Files**, and **Use Application Commands**, then use the generated URL to invite the bot.
 6. Start it:
 
    ```powershell
