@@ -14,6 +14,8 @@ Add a rarity after an English name or card number to return only that printing, 
 
 The bot replies with the official Japanese card image and Japanese card information. English names are resolved through the official English catalogue, but the displayed card always comes from the Japanese catalogue. If a name matches multiple card numbers, or a card has multiple rarities/art variants, the response includes dropdowns for switching between them.
 
+The Japanese catalogue is the source of truth for card numbers, rarities, and images. The English catalogue is used only to resolve an English name to its Japanese name. Regional naming exceptions can be added to `data/name-aliases.json` without changing bot code.
+
 ## Setup
 
 1. Install [Node.js 20.12 or newer](https://nodejs.org/).

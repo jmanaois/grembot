@@ -1,4 +1,5 @@
 import * as cheerio from "cheerio";
+import { readFileSync } from "node:fs";
 
 export const SITE_ORIGIN = "https://hololive-official-cardgame.com";
 export const ENGLISH_SITE_ORIGIN = "https://en.hololive-official-cardgame.com";
@@ -8,6 +9,9 @@ const CACHE_TTL_MS = 15 * 60 * 1000;
 const cache = new Map();
 const englishCache = new Map();
 const japaneseRarityCache = new Map();
+const nameAliases = JSON.parse(
+  readFileSync(new URL("../data/name-aliases.json", import.meta.url), "utf8")
+);
 
 export class CardSiteError extends Error {}
 
@@ -44,7 +48,7 @@ export function parseJapaneseCards(html) {
   const $ = cheerio.load(html);
   const cards = [];
 
-  $(".cardlist-Result_List_Txt > li").each((_, listItem) => {
+  $(".cardlist-Result_List_Txt > li, li.ex-item").each((_, listItem) => {
     const item = $(listItem);
     const number = cleanText(item.find(".number").first());
     if (!number) return;
@@ -189,22 +193,40 @@ export async function searchEnglishCardNames(query) {
   return results;
 }
 
-export async function searchJapaneseCardsByNameAndRarity(name, rarity) {
+export async function searchJapaneseCardsByName(name, rarity = null) {
   const normalizedName = name.trim();
-  const normalizedRarity = rarity.toUpperCase();
-  if (!normalizedName || !CARD_RARITIES.has(normalizedRarity)) return [];
+  const normalizedRarity = rarity?.toUpperCase() ?? null;
+  if (!normalizedName || (normalizedRarity && !CARD_RARITIES.has(normalizedRarity))) return [];
 
-  const key = `${normalizedName.toLowerCase()}|${normalizedRarity}`;
+  const key = `${normalizedName.toLowerCase()}|${normalizedRarity ?? "all"}`;
   const cached = japaneseRarityCache.get(key);
   if (cached && cached.expiresAt > Date.now()) return cached.cards;
 
   const url = new URL(SEARCH_URL);
   url.searchParams.set("keyword", normalizedName);
-  url.searchParams.set("rare[0]", normalizedRarity);
+  if (normalizedRarity) url.searchParams.set("rare[0]", normalizedRarity);
   url.searchParams.set("view", "text");
   url.searchParams.set("sort", "no");
-  const cards = parseJapaneseCards(await fetchCatalogueHtml(url, SITE_ORIGIN))
-    .filter(card => card.name === normalizedName && card.rarity.toUpperCase() === normalizedRarity);
+  const firstHtml = await fetchCatalogueHtml(url, SITE_ORIGIN);
+  const pages = [firstHtml];
+  const maxPage = Number.parseInt(firstHtml.match(/var\s+max_page\s*=\s*(\d+)/)?.[1] ?? "1", 10);
+
+  for (let page = 2; page <= maxPage; page += 1) {
+    const pageUrl = new URL(`${SITE_ORIGIN}/cardlist/cardsearch_ex`);
+    for (const [parameter, value] of url.searchParams) pageUrl.searchParams.append(parameter, value);
+    pageUrl.searchParams.set("page", String(page));
+    pages.push(await fetchCatalogueHtml(pageUrl, SITE_ORIGIN));
+  }
+
+  const uniqueCards = new Map();
+  for (const html of pages) {
+    for (const card of parseJapaneseCards(html)) {
+      if (card.name !== normalizedName) continue;
+      if (normalizedRarity && card.rarity.toUpperCase() !== normalizedRarity) continue;
+      uniqueCards.set(card.siteId, card);
+    }
+  }
+  const cards = [...uniqueCards.values()];
   japaneseRarityCache.set(key, { cards, expiresAt: Date.now() + CACHE_TTL_MS });
   return cards;
 }
@@ -222,31 +244,34 @@ export async function resolveCardQuery(query) {
     }
   }
 
-  const allSearchResults = await searchEnglishCardNames(lookupQuery);
-  if (!rarity) {
+  const aliasedJapaneseName = nameAliases[lookupQuery.toLowerCase()];
+  let japaneseName = aliasedJapaneseName ?? null;
+  let matchingEnglishName = lookupQuery;
+
+  if (!japaneseName) {
+    const allSearchResults = await searchEnglishCardNames(lookupQuery);
     for (const result of allSearchResults) {
-      const cards = await findJapaneseCards(result.number);
-      if (cards.length > 0) return { cards, searchResults: allSearchResults, rarity };
+      const seedCards = await findJapaneseCards(result.number);
+      if (seedCards.length === 0) continue;
+      japaneseName = seedCards[0].name;
+      matchingEnglishName = result.name;
+      break;
     }
-    return { cards: [], searchResults: allSearchResults, rarity };
   }
 
-  for (const result of allSearchResults) {
-    const seedCards = await findJapaneseCards(result.number);
-    if (seedCards.length === 0) continue;
+  if (!japaneseName) return { cards: [], searchResults: [], rarity };
+  const japaneseMatches = await searchJapaneseCardsByName(japaneseName, rarity);
+  if (japaneseMatches.length === 0) return { cards: [], searchResults: [], rarity };
 
-    const rarityMatches = await searchJapaneseCardsByNameAndRarity(seedCards[0].name, rarity);
-    if (rarityMatches.length === 0) continue;
-
-    const matchingEnglishName = result.name;
-    const choices = [...new Set(rarityMatches.map(card => card.number))].map(number => ({
-      number,
-      name: matchingEnglishName,
-      rarities: [rarity]
-    }));
-    const cards = rarityMatches.filter(card => card.number === choices[0].number);
-    return { cards, searchResults: choices, rarity };
+  const choicesByNumber = new Map();
+  for (const card of japaneseMatches) {
+    if (!choicesByNumber.has(card.number)) {
+      choicesByNumber.set(card.number, { number: card.number, name: matchingEnglishName, rarities: [] });
+    }
+    const choice = choicesByNumber.get(card.number);
+    if (!choice.rarities.includes(card.rarity)) choice.rarities.push(card.rarity);
   }
-
-  return { cards: [], searchResults: [], rarity };
+  const searchResults = [...choicesByNumber.values()].slice(0, 25);
+  const cards = japaneseMatches.filter(card => card.number === searchResults[0].number);
+  return { cards, searchResults, rarity };
 }
