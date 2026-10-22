@@ -5,7 +5,7 @@ import {
   ButtonStyle,
   EmbedBuilder
 } from "discord.js";
-import { rarityRank, sortPackCards, SPECIAL_RARITIES } from "./packs.js";
+import { RARITY_ORDER, rarityRank, sortPackCards, SPECIAL_RARITIES } from "./packs.js";
 
 const PACK_COLOR = 0x2bb9f3;
 const SPECIAL_COLOR = 0xf5b301;
@@ -157,4 +157,42 @@ export function buildLeaderboardEmbed({ guildName, category, rows, viewerId, lim
   const viewer = rows.find(row => row.userId === viewerId);
   if (viewer && !rows.slice(0, limit).includes(viewer)) lines.push("…", describe(viewer));
   return embed.setDescription(lines.join("\n"));
+}
+
+function formatPercent(chance) {
+  const percent = chance * 100;
+  return `${percent >= 10 || Number.isInteger(percent) ? percent.toFixed(percent >= 99.95 ? 0 : 1) : percent.toFixed(2)}%`;
+}
+
+function formatOneIn(chance) {
+  return chance > 0 ? `1 in ${Math.round(1 / chance).toLocaleString("en-US")} packs` : "never";
+}
+
+function rateLine(slot, odds) {
+  const marker = SPECIAL_RARITIES.has(odds.rarity) ? "✨ " : "";
+  const parts = [`${marker}\`${odds.rarity.padEnd(3)}\` ${formatPercent(odds.chance)}${slot.count > 1 ? " per card" : ""}`];
+  if (odds.perPack < 0.5) parts.push(formatOneIn(odds.perPack));
+  else if (slot.count > 1) parts.push(`in ${formatPercent(odds.perPack)} of packs`);
+  if (odds.cards) parts.push(`${odds.cards} card${odds.cards === 1 ? "" : "s"}, a specific one ${formatOneIn(odds.perCardPerPack)}`);
+  return parts.join(" • ");
+}
+
+export function buildPackRatesEmbed({ set = null, odds }) {
+  const cardsPerPack = odds.reduce((sum, slot) => sum + slot.count, 0);
+  const embed = new EmbedBuilder()
+    .setColor(PACK_COLOR)
+    .setTitle(set ? `Pack rates — ${set.name}` : "Pack rates")
+    .setDescription([
+      `**${cardsPerPack} cards per pack.** Rarity order, lowest to highest:`,
+      RARITY_ORDER.map(rarity => `\`${rarity}\``).join(" < "),
+      set ? "" : "\nPick a set to see its card counts and odds for a specific card. Sets missing a rarity give its odds to the most common rarity in that slot."
+    ].join("\n").trim())
+    .setFooter({ text: "These are this bot's approximate rates, not official pull rates. Cheer cards and S/HR/OC/P printings aren't in packs." });
+  for (const slot of odds) {
+    embed.addFields({
+      name: slot.count > 1 ? `${slot.name} slots ×${slot.count}` : `${slot.name} slot`,
+      value: slot.rarities.map(rarityOdds => rateLine(slot, rarityOdds)).join("\n").slice(0, 1024) || "—"
+    });
+  }
+  return embed;
 }

@@ -7,13 +7,22 @@ import {
   buildCollectionEmbed,
   buildLeaderboardEmbed,
   buildPackMessage,
+  buildPackRatesEmbed,
   formatCooldown,
   LEADERBOARD_CATEGORIES,
   parseOpenPackButtonId,
   sortBinderCards
 } from "./pack-response.js";
 import { buildPackGridImage } from "./pack-image.js";
-import { bestPull, openPack, pullableCards, sortPackCards, toPackCard } from "./packs.js";
+import {
+  bestPull,
+  countPullableByRarity,
+  openPack,
+  packOdds,
+  pullableCards,
+  sortPackCards,
+  toPackCard
+} from "./packs.js";
 
 async function setPackCards(code) {
   return (await getJapaneseSetCards(code)).map(toPackCard);
@@ -68,7 +77,7 @@ function cooldownMessage(availableAt) {
 export function createPackHandlers(db) {
   return {
     async autocomplete(interaction) {
-      if (!["openpack", "binder"].includes(interaction.commandName)) return;
+      if (!["openpack", "binder", "packrates"].includes(interaction.commandName)) return;
       const typed = interaction.options.getFocused().toLowerCase();
       const sets = await listJapaneseBoosterSets().catch(error => {
         console.warn("Could not load booster sets for autocomplete.", error);
@@ -107,6 +116,27 @@ export function createPackHandlers(db) {
         return;
       }
       await openPackFor(db, interaction, set);
+    },
+
+    async packrates(interaction) {
+      const requested = interaction.options.getString("set")?.trim().toLowerCase();
+      if (!requested) {
+        await interaction.reply({ embeds: [buildPackRatesEmbed({ odds: packOdds() })] });
+        return;
+      }
+      const set = (await listJapaneseBoosterSets()).find(candidate =>
+        [candidate.code, candidate.name, candidate.japaneseName].some(name => name.toLowerCase() === requested)
+      );
+      if (!set) {
+        await interaction.reply({
+          content: "That isn't a booster set. Pick one from the list as you type.",
+          flags: MessageFlags.Ephemeral
+        });
+        return;
+      }
+      await interaction.deferReply();
+      const cardCounts = countPullableByRarity(await setPackCards(set.code));
+      await interaction.editReply({ embeds: [buildPackRatesEmbed({ set, odds: packOdds({ cardCounts }) })] });
     },
 
     async collection(interaction) {

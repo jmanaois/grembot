@@ -25,6 +25,19 @@ export function rarityRank(rarity) {
   return index === -1 ? -1 : index;
 }
 
+// A rarity the set lacks hands its weight to the most common rarity left in the slot,
+// so missing low rarities never make the rare ones more likely.
+export function slotWeights(slot, hasRarity = () => true) {
+  const entries = Object.entries(slot.rarities).filter(([, weight]) => weight > 0);
+  const present = entries.filter(([rarity]) => hasRarity(rarity));
+  if (present.length === 0) return [];
+  const missingWeight = entries
+    .filter(([rarity]) => !hasRarity(rarity))
+    .reduce((sum, [, weight]) => sum + weight, 0);
+  const lowest = present.reduce((low, entry) => rarityRank(entry[0]) < rarityRank(low[0]) ? entry : low);
+  return present.map(([rarity, weight]) => [rarity, rarity === lowest[0] ? weight + missingWeight : weight]);
+}
+
 function pickWeighted(weights, random) {
   const total = weights.reduce((sum, [, weight]) => sum + weight, 0);
   let roll = random() * total;
@@ -47,9 +60,7 @@ export function openPack(setCards, { rates = PACK_RATES, random = Math.random } 
   const pulled = [];
   const pulledIds = new Set();
   for (const slot of rates.slots) {
-    // Rarities missing from this set are dropped and the remaining odds rescale.
-    const weights = Object.entries(slot.rarities)
-      .filter(([rarity, weight]) => weight > 0 && cardsByRarity.has(rarity));
+    const weights = slotWeights(slot, rarity => cardsByRarity.has(rarity));
     if (weights.length === 0) continue;
     for (let index = 0; index < slot.count; index += 1) {
       const pool = cardsByRarity.get(pickWeighted(weights, random));
@@ -67,6 +78,41 @@ export function openPack(setCards, { rates = PACK_RATES, random = Math.random } 
 export function pullableCards(setCards, rates = PACK_RATES) {
   const rarities = new Set(rates.slots.flatMap(slot => Object.keys(slot.rarities)));
   return setCards.filter(card => card.cardType !== "CHEER" && rarities.has(card.rarity?.toUpperCase()));
+}
+
+export function countPullableByRarity(setCards, rates = PACK_RATES) {
+  const counts = new Map();
+  for (const card of pullableCards(setCards, rates)) {
+    const rarity = card.rarity.toUpperCase();
+    counts.set(rarity, (counts.get(rarity) ?? 0) + 1);
+  }
+  return counts;
+}
+
+// Odds per slot draw and per pack. Without card counts, every rarity in the rates is assumed present.
+// Per-card odds ignore the no-duplicates-in-a-pack rule, so they are close but not exact for common slots.
+export function packOdds({ rates = PACK_RATES, cardCounts = null } = {}) {
+  return rates.slots.map(slot => {
+    const weights = slotWeights(slot, rarity => !cardCounts || cardCounts.get(rarity) > 0);
+    const total = weights.reduce((sum, [, weight]) => sum + weight, 0);
+    return {
+      name: slot.name,
+      count: slot.count,
+      rarities: weights
+        .map(([rarity, weight]) => {
+          const chance = weight / total;
+          const cards = cardCounts?.get(rarity) ?? null;
+          return {
+            rarity,
+            chance,
+            perPack: 1 - (1 - chance) ** slot.count,
+            cards,
+            perCardPerPack: cards ? 1 - (1 - chance / cards) ** slot.count : null
+          };
+        })
+        .sort((left, right) => rarityRank(left.rarity) - rarityRank(right.rarity))
+    };
+  });
 }
 
 export function sortPackCards(cards) {

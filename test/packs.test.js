@@ -73,7 +73,7 @@ test("opens 8-card packs with 6 common, 1 rare, and 1 hit slot", () => {
   assert.ok(!pack.some(card => card.rarity === "S"));
 });
 
-test("makes OUR and SEC the rarest hits and rescales missing rarities", () => {
+test("makes OUR and SEC the rarest hits and gives missing rarities' odds to the most common one", () => {
   const random = seededRandom(42);
   const hits = {};
   for (let index = 0; index < 5_000; index += 1) {
@@ -84,8 +84,9 @@ test("makes OUR and SEC the rarest hits and rescales missing rarities", () => {
   assert.ok(hits.SR > hits.OSR && hits.SR > hits.UR);
   assert.ok(hits.OUR < hits.OSR && hits.OUR < hits.UR);
   assert.ok(hits.SEC < hits.OSR && hits.SEC < hits.UR);
-  // SY's weight is spread over the rest, so SEC lands near 4/92 of hits.
-  assert.ok(Math.abs(hits.SEC / 5_000 - 4 / 92) < 0.015);
+  // SY's weight goes to SR, so SEC keeps its 4% and SR gets 68%.
+  assert.ok(Math.abs(hits.SEC / 5_000 - 0.04) < 0.012);
+  assert.ok(Math.abs(hits.SR / 5_000 - 0.68) < 0.03);
 });
 
 test("refuses sets with no pullable cards", () => {

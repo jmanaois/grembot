@@ -97,6 +97,14 @@ export const leaderboardCommand = new SlashCommandBuilder()
       { name: "UR/OUR/SEC pulls", value: "special" }
     ));
 
+export const packRatesCommand = new SlashCommandBuilder()
+  .setName("packrates")
+  .setDescription("Show the rarity order and pull rates for packs")
+  .addStringOption(option => option
+    .setName("set")
+    .setDescription("Booster set, for its card counts and per-card odds")
+    .setAutocomplete(true));
+
 export const commands = [
   cardCommand,
   randomCardCommand,
@@ -104,6 +112,7 @@ export const commands = [
   compareCommand,
   priceCommand,
   openPackCommand,
+  packRatesCommand,
   collectionCommand,
   binderCommand,
   leaderboardCommand,
