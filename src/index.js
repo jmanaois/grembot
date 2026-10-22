@@ -181,6 +181,8 @@ const commandHandlers = {
 
   openpack: packHandlers.openpack,
   collection: packHandlers.collection,
+  binder: packHandlers.binder,
+  leaderboard: packHandlers.leaderboard,
   packcooldown: packHandlers.packcooldown
 };
 

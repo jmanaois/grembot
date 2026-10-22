@@ -72,6 +72,31 @@ export const packCooldownCommand = new SlashCommandBuilder()
     .setMinValue(0)
     .setMaxValue(168));
 
+export const binderCommand = new SlashCommandBuilder()
+  .setName("binder")
+  .setDescription("Flip through a set and see which cards someone has collected")
+  .setContexts(InteractionContextType.Guild)
+  .addStringOption(option => option
+    .setName("set")
+    .setDescription("Booster set (defaults to the set with the most cards collected)")
+    .setAutocomplete(true))
+  .addUserOption(option => option
+    .setName("user")
+    .setDescription("Whose binder to show (defaults to you)"));
+
+export const leaderboardCommand = new SlashCommandBuilder()
+  .setName("leaderboard")
+  .setDescription("Show this server's top collectors")
+  .setContexts(InteractionContextType.Guild)
+  .addStringOption(option => option
+    .setName("category")
+    .setDescription("What to rank by (defaults to unique cards)")
+    .addChoices(
+      { name: "Unique cards", value: "unique" },
+      { name: "Packs opened", value: "packs" },
+      { name: "UR/OUR/SEC pulls", value: "special" }
+    ));
+
 export const commands = [
   cardCommand,
   randomCardCommand,
@@ -80,5 +105,7 @@ export const commands = [
   priceCommand,
   openPackCommand,
   collectionCommand,
+  binderCommand,
+  leaderboardCommand,
   packCooldownCommand
 ];

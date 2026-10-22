@@ -27,7 +27,11 @@ The Japanese catalogue remains the preferred source of truth. The English catalo
 
 - `/openpack set:` opens an 8-card booster pack and saves the cards to your collection. Start typing to pick a set (English or Japanese set names both work). Packs come from the Japanese catalogue, so every Japanese booster and extra booster is available, including sets not yet released in English.
 - `/collection user:` shows packs opened, unique cards, completion for each set, and the rarest cards pulled.
+- `/binder set: user:` flips through every card in a set, 20 per page, marking which ones have been collected and how many copies. Buttons switch pages and toggle between all, owned, and missing cards. Without a set, it opens the set with the most cards collected.
+- `/leaderboard category:` ranks the server by unique cards, packs opened, or UR/OUR/SEC pulls, and shows your own rank if you're outside the top ten.
 - `/packcooldown hours:` lets members with **Manage Server** set how long people wait between packs (0 turns it off, the default). Run it without `hours` to see the current setting.
+
+Opened packs are shown as a single image of all eight cards, rarest last, with special pulls framed in gold (this uses [sharp](https://sharp.pixelplumbing.com/)). If the image can't be drawn, the best pull's card image is shown instead.
 
 Collections are kept separately for each server. Each pack has 6 common slots (C or U), 1 rare slot (R or RR), and 1 hit slot (SR, OSR, SY, UR, OUR, or SEC, with OUR and SEC the least likely). Cheer cards and S/HR printings are not pulled. English set names come from `data/booster-sets.json`; a new set without an entry there still appears under its Japanese name until one is added. Each set's card list is loaded from the official site the first time it is opened and cached for six hours. The odds live in `data/pack-rates.json` as relative weights per slot; when a set has no cards of a rarity, the other rarities in that slot share its odds. They are approximations, not official pull rates.
 

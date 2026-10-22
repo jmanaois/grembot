@@ -69,6 +69,10 @@ export function pullableCards(setCards, rates = PACK_RATES) {
   return setCards.filter(card => card.cardType !== "CHEER" && rarities.has(card.rarity?.toUpperCase()));
 }
 
+export function sortPackCards(cards) {
+  return [...cards].sort((left, right) => rarityRank(left.rarity) - rarityRank(right.rarity));
+}
+
 export function bestPull(cards) {
   return cards.reduce((best, card) => rarityRank(card.rarity) > rarityRank(best.rarity) ? card : best);
 }

@@ -74,7 +74,33 @@ export function openDatabase(path) {
       SELECT card_id AS cardId, edition, card_number AS cardNumber, name, rarity, COUNT(*) AS copies
       FROM pulls WHERE guild_id = ? AND user_id = ?
       GROUP BY edition, card_id
+    `),
+    ownedInSet: db.prepare(`
+      SELECT card_id AS cardId, COUNT(*) AS copies
+      FROM pulls WHERE guild_id = ? AND user_id = ? AND set_name = ? AND edition = 'japanese'
+      GROUP BY card_id
+    `),
+    mostOwnedSet: db.prepare(`
+      SELECT set_name AS setName FROM pulls
+      WHERE guild_id = ? AND user_id = ? AND edition = 'japanese'
+      GROUP BY set_name ORDER BY COUNT(DISTINCT card_id) DESC, MAX(pulled_at) DESC LIMIT 1
+    `),
+    leaderboardUnique: db.prepare(`
+      SELECT user_id AS userId, COUNT(DISTINCT edition || ':' || card_id) AS score
+      FROM pulls WHERE guild_id = ? GROUP BY user_id
+    `),
+    leaderboardPacks: db.prepare(`
+      SELECT user_id AS userId, packs_opened AS score FROM pack_opens WHERE guild_id = ? AND packs_opened > 0
+    `),
+    leaderboardSpecial: db.prepare(`
+      SELECT user_id AS userId, COUNT(*) AS score
+      FROM pulls WHERE guild_id = ? AND rarity IN ('UR', 'OUR', 'SEC') GROUP BY user_id
     `)
+  };
+  const leaderboardStatements = {
+    unique: statements.leaderboardUnique,
+    packs: statements.leaderboardPacks,
+    special: statements.leaderboardSpecial
   };
 
   function packCooldownMinutes(guildId) {
@@ -119,6 +145,28 @@ export function openDatabase(path) {
         db.exec("ROLLBACK");
         throw error;
       }
+    },
+
+    ownedInSet(guildId, userId, setName) {
+      return new Map(statements.ownedInSet.all(guildId, userId, setName).map(row => [row.cardId, row.copies]));
+    },
+
+    mostOwnedSet(guildId, userId) {
+      return statements.mostOwnedSet.get(guildId, userId)?.setName ?? null;
+    },
+
+    // Ranked best first; ties share a rank and are ordered by user ID so the list is stable.
+    leaderboard(guildId, category) {
+      const statement = leaderboardStatements[category];
+      if (!statement) throw new Error(`Unknown leaderboard category: ${category}`);
+      const rows = statement.all(guildId)
+        .map(row => ({ userId: row.userId, score: row.score }))
+        .sort((left, right) => right.score - left.score || left.userId.localeCompare(right.userId));
+      let rank = 0;
+      return rows.map((row, index) => {
+        if (index === 0 || row.score !== rows[index - 1].score) rank = index + 1;
+        return { ...row, rank };
+      });
     },
 
     collectionSummary(guildId, userId) {
