@@ -1,0 +1,7 @@
+{
+  "slots": [
+    { "name": "Common", "count": 6, "rarities": { "C": 3, "U": 1 } },
+    { "name": "Rare", "count": 1, "rarities": { "R": 3, "RR": 1 } },
+    { "name": "Hit", "count": 1, "rarities": { "SR": 60, "OSR": 12, "UR": 12, "SY": 8, "OUR": 4, "SEC": 4 } }
+  ]
+}

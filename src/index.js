@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { fileURLToPath } from "node:url";
 import { Client, Events, GatewayIntentBits, MessageFlags, PermissionFlagsBits } from "discord.js";
 import { findJapaneseCards, CardSiteError } from "./card-site.js";
 import {
@@ -11,6 +12,9 @@ import {
 import { extractInlineQueries, utcDateKey } from "./card-features.js";
 import { loadCardExtras, lookupCards, lookupCardsForSummary } from "./card-lookup.js";
 import { buildDailyCardMessage, startDailyCardSchedule } from "./daily-card.js";
+import { openDatabase } from "./database.js";
+import { createPackHandlers } from "./pack-commands.js";
+import { PackError } from "./packs.js";
 import {
   findEnglishCardsByNumber,
   getRandomCardSummary,
@@ -24,6 +28,10 @@ if (!process.env.DISCORD_TOKEN) {
 const inlineLookupsEnabled = process.env.INLINE_LOOKUPS === "true";
 const dailyCardChannelId = process.env.DAILY_CARD_CHANNEL_ID;
 const dailyCardHourUtc = Number.parseInt(process.env.DAILY_CARD_HOUR_UTC ?? "15", 10);
+
+const databasePath = process.env.DATABASE_PATH ?? fileURLToPath(new URL("../data/grembot.db", import.meta.url));
+const db = openDatabase(databasePath);
+const packHandlers = createPackHandlers(db);
 
 const intents = [GatewayIntentBits.Guilds];
 if (inlineLookupsEnabled) intents.push(GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent);
@@ -169,10 +177,15 @@ const commandHandlers = {
       return;
     }
     await interaction.editReply({ embeds: [buildPriceEmbed(englishCards)] });
-  }
+  },
+
+  openpack: packHandlers.openpack,
+  collection: packHandlers.collection,
+  packcooldown: packHandlers.packcooldown
 };
 
 function describeError(error) {
+  if (error instanceof PackError) return error.message;
   return error instanceof CardSiteError
     ? `Could not search the card catalogue: ${error.message}`
     : error instanceof OshiCardApiError
@@ -181,6 +194,10 @@ function describeError(error) {
 }
 
 client.on(Events.InteractionCreate, async interaction => {
+  if (interaction.isAutocomplete()) {
+    await packHandlers.autocomplete(interaction).catch(error => console.error(error));
+    return;
+  }
   if (!interaction.isChatInputCommand()) return;
   const handler = commandHandlers[interaction.commandName];
   if (!handler) return;

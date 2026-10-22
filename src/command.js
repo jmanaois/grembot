@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from "discord.js";
+import { InteractionContextType, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 import { CARD_RARITIES } from "./card-site.js";
 import { CARD_COLORS } from "./oshi-card-api.js";
 
@@ -43,4 +43,42 @@ export const priceCommand = addQueryOption(new SlashCommandBuilder()
   .setName("price")
   .setDescription("Compare English market prices across every printing of a card"), "query");
 
-export const commands = [cardCommand, randomCardCommand, dailyCardCommand, compareCommand, priceCommand];
+export const openPackCommand = new SlashCommandBuilder()
+  .setName("openpack")
+  .setDescription("Open a booster pack and add the cards to your collection in this server")
+  .setContexts(InteractionContextType.Guild)
+  .addStringOption(option => option
+    .setName("set")
+    .setDescription("Booster set to open")
+    .setRequired(true)
+    .setAutocomplete(true));
+
+export const collectionCommand = new SlashCommandBuilder()
+  .setName("collection")
+  .setDescription("Show the cards someone has pulled in this server")
+  .setContexts(InteractionContextType.Guild)
+  .addUserOption(option => option
+    .setName("user")
+    .setDescription("Whose collection to show (defaults to you)"));
+
+export const packCooldownCommand = new SlashCommandBuilder()
+  .setName("packcooldown")
+  .setDescription("Show or set how long members wait between packs in this server")
+  .setContexts(InteractionContextType.Guild)
+  .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+  .addNumberOption(option => option
+    .setName("hours")
+    .setDescription("Hours between packs; 0 turns the cooldown off")
+    .setMinValue(0)
+    .setMaxValue(168));
+
+export const commands = [
+  cardCommand,
+  randomCardCommand,
+  dailyCardCommand,
+  compareCommand,
+  priceCommand,
+  openPackCommand,
+  collectionCommand,
+  packCooldownCommand
+];

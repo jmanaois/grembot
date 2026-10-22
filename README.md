@@ -23,6 +23,16 @@ The Japanese catalogue remains the preferred source of truth. The English catalo
 - `/compare first:kanata second:ayame sec` shows two cards side by side, with their English market prices.
 - `/price query:hBP01-001` lists every English printing of a card from most to least expensive, with 7- and 30-day market price changes when there is enough history.
 
+### Packs and collections
+
+- `/openpack set:` opens an 8-card booster pack and saves the cards to your collection. Start typing to pick a set; only booster sets (including Extra Boosters) can be opened.
+- `/collection user:` shows packs opened, unique cards, completion for each set, and the rarest cards pulled.
+- `/packcooldown hours:` lets members with **Manage Server** set how long people wait between packs (0 turns it off, the default). Run it without `hours` to see the current setting.
+
+Collections are kept separately for each server. Each pack has 6 common slots (C or U), 1 rare slot (R or RR), and 1 hit slot (SR, OSR, SY, UR, OUR, or SEC, with OUR and SEC the least likely). Cheer cards and S/HR printings are not pulled. The odds live in `data/pack-rates.json` as relative weights per slot; when a set has no cards of a rarity, the other rarities in that slot share its odds. They are approximations, not official pull rates.
+
+Collections are stored in a SQLite database at `data/grembot.db`. Set `DATABASE_PATH` to keep it somewhere else, and back that file up if the collections matter to your server.
+
 ### Inline lookups
 
 When `INLINE_LOOKUPS=true`, writing `[[card name]]` in any message makes the bot reply with that card, for example `that [[ayame sec]] pull was insane`. Up to three cards per message are shown. This needs the privileged **Message Content Intent**: turn it on under **Bot > Privileged Gateway Intents** in the Developer Portal before you enable the setting, or the bot will fail to log in.
@@ -33,7 +43,7 @@ Set `DAILY_CARD_CHANNEL_ID` to a channel ID to post a card of the day there. `DA
 
 ## Setup
 
-1. Install [Node.js 20.12 or newer](https://nodejs.org/).
+1. Install [Node.js 22.13 or newer](https://nodejs.org/).
 2. In the [Discord Developer Portal](https://discord.com/developers/applications), create an application and bot.
 3. Copy `.env.example` to `.env`, then fill in:
    - `DISCORD_TOKEN`: token from the Bot page.
@@ -41,6 +51,7 @@ Set `DAILY_CARD_CHANNEL_ID` to a channel ID to post a card of the day there. `DA
    - `GUILD_ID`: optional development server ID. Guild commands update immediately; global commands can take longer to appear.
    - `INLINE_LOOKUPS`: optional; set to `true` to enable `[[card]]` lookups.
    - `DAILY_CARD_CHANNEL_ID` and `DAILY_CARD_HOUR_UTC`: optional card of the day settings.
+   - `DATABASE_PATH`: optional location for the collections database.
 4. Install and register the commands:
 
    ```powershell
