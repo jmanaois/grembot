@@ -5,12 +5,19 @@ export const PACK_RATES = JSON.parse(
 );
 export const RARITY_ORDER = ["C", "U", "R", "RR", "SR", "SY", "OSR", "UR", "OUR", "SEC"];
 export const SPECIAL_RARITIES = new Set(["UR", "OUR", "SEC"]);
-const BOOSTER_SET_PATTERN = /^(Booster Pack|Extra Booster) – /;
 
 export class PackError extends Error {}
 
-export function isBoosterSet(setName) {
-  return BOOSTER_SET_PATTERN.test(setName);
+export function toPackCard(card) {
+  return {
+    id: Number(card.siteId),
+    siteId: card.siteId,
+    cardNumber: card.number,
+    name: card.name,
+    rarity: card.rarity,
+    cardType: card.metadata?.["カードタイプ"] === "エール" ? "CHEER" : card.metadata?.["カードタイプ"],
+    imageUrl: card.imageUrl
+  };
 }
 
 export function rarityRank(rarity) {

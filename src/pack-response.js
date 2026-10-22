@@ -26,7 +26,7 @@ export function buildPackMessage({ userName, setName, cards, best, imageFile = n
   return payload;
 }
 
-export function buildCollectionEmbed({ userName, summary, setSizes }) {
+export function buildCollectionEmbed({ userName, summary, sets }) {
   const embed = new EmbedBuilder()
     .setColor(PACK_COLOR)
     .setTitle(`${userName}'s collection`);
@@ -40,11 +40,10 @@ export function buildCollectionEmbed({ userName, summary, setSizes }) {
     `**Unique cards:** ${summary.uniqueCards}`
   ].join("\n"));
 
-  const setLines = summary.sets.map(({ setName, owned }) => {
-    const size = setSizes.get(setName);
-    if (!size) return `**${setName}:** ${owned}`;
+  const setLines = sets.map(({ label, owned, size }) => {
+    if (!size) return `**${label}:** ${owned}`;
     const percent = Math.min(100, (owned / size) * 100);
-    return `**${setName}:** ${owned}/${size} (${percent.toFixed(1)}%)`;
+    return `**${label}:** ${owned}/${size} (${percent.toFixed(1)}%)`;
   });
   embed.addFields({ name: "Set completion", value: setLines.join("\n").slice(0, 1024) });
 

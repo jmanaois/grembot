@@ -5,12 +5,20 @@ export const SITE_ORIGIN = "https://hololive-official-cardgame.com";
 export const ENGLISH_SITE_ORIGIN = "https://en.hololive-official-cardgame.com";
 const SEARCH_URL = `${SITE_ORIGIN}/cardlist/cardsearch/`;
 const ENGLISH_SEARCH_URL = `${ENGLISH_SITE_ORIGIN}/cardlist/cardsearch/`;
+const CARDLIST_URL = `${SITE_ORIGIN}/cardlist/`;
 const CACHE_TTL_MS = 15 * 60 * 1000;
+const SET_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+const PAGE_CONCURRENCY = 4;
+const BOOSTER_SET_PREFIXES = ["ブースターパック", "エクストラブースター"];
 const cache = new Map();
 const englishCache = new Map();
 const japaneseRarityCache = new Map();
+const setCache = new Map();
 const nameAliases = JSON.parse(
   readFileSync(new URL("../data/name-aliases.json", import.meta.url), "utf8")
+);
+const boosterSetNames = JSON.parse(
+  readFileSync(new URL("../data/booster-sets.json", import.meta.url), "utf8")
 );
 
 export class CardSiteError extends Error {}
@@ -194,6 +202,77 @@ export async function searchEnglishCardNames(query) {
   return results;
 }
 
+async function fetchAllSearchPages(url) {
+  const firstHtml = await fetchCatalogueHtml(url, SITE_ORIGIN);
+  const maxPage = Number.parseInt(firstHtml.match(/var\s+max_page\s*=\s*(\d+)/)?.[1] ?? "1", 10);
+  const pageUrls = [];
+  for (let page = 2; page <= Math.min(maxPage, 50); page += 1) {
+    const pageUrl = new URL(`${SITE_ORIGIN}/cardlist/cardsearch_ex`);
+    for (const [parameter, value] of url.searchParams) pageUrl.searchParams.append(parameter, value);
+    pageUrl.searchParams.set("page", String(page));
+    pageUrls.push(pageUrl);
+  }
+
+  const pages = [firstHtml];
+  for (let index = 0; index < pageUrls.length; index += PAGE_CONCURRENCY) {
+    pages.push(...await Promise.all(
+      pageUrls.slice(index, index + PAGE_CONCURRENCY).map(pageUrl => fetchCatalogueHtml(pageUrl, SITE_ORIGIN))
+    ));
+  }
+  return pages;
+}
+
+export function parseBoosterSets(html) {
+  const $ = cheerio.load(html);
+  const sets = new Map();
+  $("select[name=expansion_name] option").each((_, option) => {
+    const code = $(option).attr("value")?.trim();
+    const japaneseName = cleanText($(option));
+    if (!code || !/^[A-Za-z0-9]+$/.test(code)) return;
+    if (!BOOSTER_SET_PREFIXES.some(prefix => japaneseName.startsWith(prefix))) return;
+    const englishName = boosterSetNames[code];
+    sets.set(code, {
+      code,
+      japaneseName,
+      name: englishName ? `${englishName} (${code})` : `${japaneseName} (${code})`
+    });
+  });
+  return [...sets.values()].sort((left, right) => left.code.localeCompare(right.code));
+}
+
+function cachedSetValue(key, load) {
+  const cached = setCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+  const value = load().catch(error => {
+    setCache.delete(key);
+    throw error;
+  });
+  setCache.set(key, { value, expiresAt: Date.now() + SET_CACHE_TTL_MS });
+  return value;
+}
+
+export function listJapaneseBoosterSets() {
+  return cachedSetValue("sets", async () => parseBoosterSets(await fetchCatalogueHtml(CARDLIST_URL, SITE_ORIGIN)));
+}
+
+export function getJapaneseSetCards(code) {
+  if (!/^[A-Za-z0-9]{2,16}$/.test(code)) {
+    return Promise.reject(new CardSiteError("Set codes may only contain letters and numbers."));
+  }
+  return cachedSetValue(`set|${code}`, async () => {
+    const url = new URL(SEARCH_URL);
+    url.searchParams.set("keyword", "");
+    url.searchParams.set("expansion_name", code);
+    url.searchParams.set("view", "text");
+    url.searchParams.set("sort", "no");
+    const uniqueCards = new Map();
+    for (const html of await fetchAllSearchPages(url)) {
+      for (const card of parseJapaneseCards(html)) uniqueCards.set(card.siteId, card);
+    }
+    return [...uniqueCards.values()];
+  });
+}
+
 export async function searchJapaneseCardsByName(name, rarity = null) {
   const normalizedName = name.trim();
   const normalizedRarity = rarity?.toUpperCase() ?? null;
@@ -208,16 +287,7 @@ export async function searchJapaneseCardsByName(name, rarity = null) {
   if (normalizedRarity) url.searchParams.set("rare[0]", normalizedRarity);
   url.searchParams.set("view", "text");
   url.searchParams.set("sort", "no");
-  const firstHtml = await fetchCatalogueHtml(url, SITE_ORIGIN);
-  const pages = [firstHtml];
-  const maxPage = Number.parseInt(firstHtml.match(/var\s+max_page\s*=\s*(\d+)/)?.[1] ?? "1", 10);
-
-  for (let page = 2; page <= maxPage; page += 1) {
-    const pageUrl = new URL(`${SITE_ORIGIN}/cardlist/cardsearch_ex`);
-    for (const [parameter, value] of url.searchParams) pageUrl.searchParams.append(parameter, value);
-    pageUrl.searchParams.set("page", String(page));
-    pages.push(await fetchCatalogueHtml(pageUrl, SITE_ORIGIN));
-  }
+  const pages = await fetchAllSearchPages(url);
 
   const uniqueCards = new Map();
   for (const html of pages) {

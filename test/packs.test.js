@@ -2,7 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { openDatabase } from "../src/database.js";
 import { buildCollectionEmbed, buildPackMessage, formatCooldown } from "../src/pack-response.js";
-import { bestPull, isBoosterSet, openPack, PACK_RATES, PackError, pullableCards } from "../src/packs.js";
+import { bestPull, openPack, PACK_RATES, PackError, pullableCards, toPackCard } from "../src/packs.js";
+import { parseBoosterSets } from "../src/card-site.js";
 
 let nextId = 1;
 const makeCards = (rarity, count, cardType = "HOLOMEM") => Array.from({ length: count }, () => {
@@ -31,11 +32,34 @@ function seededRandom(seed) {
   };
 }
 
-test("only booster sets can be opened", () => {
-  assert.equal(isBoosterSet("Booster Pack – Quintet Spectrum"), true);
-  assert.equal(isBoosterSet("Extra Booster – Summer hologram"), true);
-  assert.equal(isBoosterSet("Start Deck – Oshi Advent"), false);
-  assert.equal(isBoosterSet("PROMO CARDS"), false);
+test("lists only Japanese booster sets, with English names when known", () => {
+  const html = `<select name="expansion_name">
+    <option value="">指定なし</option>
+    <option value="hBP09">ブースターパック「ボリュームヴォルテックス」</option>
+    <option value="hEB01">エクストラブースター サマー・ホログラム</option>
+    <option value="hSD12">スタートデッキ 推し Advent</option>
+    <option value="hPR">PRカード</option>
+    <option value="hBP99">ブースターパック「みらいセット」</option>
+  </select>`;
+  assert.deepEqual(parseBoosterSets(html), [
+    { code: "hBP09", japaneseName: "ブースターパック「ボリュームヴォルテックス」", name: "Volume Vortex (hBP09)" },
+    { code: "hBP99", japaneseName: "ブースターパック「みらいセット」", name: "ブースターパック「みらいセット」 (hBP99)" },
+    { code: "hEB01", japaneseName: "エクストラブースター サマー・ホログラム", name: "Summer Hologram (hEB01)" }
+  ]);
+});
+
+test("maps Japanese catalogue cards into pack cards", () => {
+  const base = { siteId: "1234", number: "hBP08-001", name: "天音かなた", rarity: "SEC", imageUrl: "https://hololive-official-cardgame.com/a.png" };
+  assert.deepEqual(toPackCard({ ...base, metadata: { "カードタイプ": "ホロメン" } }), {
+    id: 1234,
+    siteId: "1234",
+    cardNumber: "hBP08-001",
+    name: "天音かなた",
+    rarity: "SEC",
+    cardType: "ホロメン",
+    imageUrl: "https://hololive-official-cardgame.com/a.png"
+  });
+  assert.equal(toPackCard({ ...base, metadata: { "カードタイプ": "エール" } }).cardType, "CHEER");
 });
 
 test("opens 8-card packs with 6 common, 1 rare, and 1 hit slot", () => {
@@ -92,10 +116,41 @@ test("saves packs per server and enforces the server's cooldown", () => {
   assert.equal(summary.packsOpened, 3);
   assert.equal(summary.totalCards, 24);
   assert.equal(summary.uniqueCards, 8);
-  assert.deepEqual(summary.sets, [{ setName: "Set", owned: 8 }]);
+  assert.deepEqual(summary.sets, [{ setName: "Set", edition: "japanese", owned: 8 }]);
   assert.equal(db.collectionSummary("other", "user").totalCards, 8);
   assert.equal(db.collectionSummary("guild", "someone else").totalCards, 0);
   db.close();
+});
+
+test("keeps pulls saved before the edition column apart from Japanese pulls", async () => {
+  const { mkdtempSync, rmSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const { DatabaseSync } = await import("node:sqlite");
+  const directory = mkdtempSync(join(tmpdir(), "grembot-db-"));
+  const path = join(directory, "old.db");
+  try {
+    const old = new DatabaseSync(path);
+    old.exec(`CREATE TABLE pulls (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, guild_id TEXT NOT NULL, user_id TEXT NOT NULL, card_id INTEGER NOT NULL,
+      card_number TEXT NOT NULL, name TEXT NOT NULL, rarity TEXT NOT NULL, set_name TEXT NOT NULL,
+      image_url TEXT, pulled_at INTEGER NOT NULL)`);
+    old.exec(`INSERT INTO pulls (guild_id, user_id, card_id, card_number, name, rarity, set_name, pulled_at)
+      VALUES ('guild', 'user', 31, 'hBP01-001', 'Amane Kanata', 'OSR', 'Booster Pack – Blooming Radiance', 1)`);
+    old.close();
+
+    const db = openDatabase(path);
+    db.savePack({ guildId: "guild", userId: "user", setName: "hBP01", cards: [{ id: 31, cardNumber: "hBP08-001", name: "天音かなた", rarity: "SEC" }], now: 2 });
+    const summary = db.collectionSummary("guild", "user");
+    assert.equal(summary.uniqueCards, 2);
+    assert.deepEqual(summary.sets, [
+      { setName: "hBP01", edition: "japanese", owned: 1 },
+      { setName: "Booster Pack – Blooming Radiance", edition: "english", owned: 1 }
+    ]);
+    db.close();
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test("shows the pack rarest-last and highlights special pulls", () => {
@@ -114,7 +169,7 @@ test("summarizes collections with set completion", () => {
   const empty = buildCollectionEmbed({
     userName: "Julian",
     summary: { totalCards: 0, sets: [], ownedCards: [] },
-    setSizes: new Map()
+    sets: []
   });
   assert.match(empty.data.description, /openpack/);
 
@@ -124,15 +179,15 @@ test("summarizes collections with set completion", () => {
       packsOpened: 1,
       totalCards: 8,
       uniqueCards: 2,
-      sets: [{ setName: "Booster Pack – Test", owned: 2 }],
+      sets: [{ setName: "hBP08", edition: "japanese", owned: 2 }],
       ownedCards: [
         { cardNumber: "hBP01-002", name: "Filler", rarity: "C", copies: 7 },
         { cardNumber: "hBP01-001", name: "Top", rarity: "OUR", copies: 1 }
       ]
     },
-    setSizes: new Map([["Booster Pack – Test", 8]])
+    sets: [{ label: "Bouncer Bound (hBP08)", owned: 2, size: 8 }, { label: "Old Set (English edition)", owned: 3, size: null }]
   });
-  assert.equal(embed.data.fields[0].value, "**Booster Pack – Test:** 2/8 (25.0%)");
+  assert.equal(embed.data.fields[0].value, "**Bouncer Bound (hBP08):** 2/8 (25.0%)\n**Old Set (English edition):** 3");
   assert.match(embed.data.fields[1].value, /^✨ `OUR` hBP01-001 — Top\n`C  ` hBP01-002 — Filler ×7$/);
 });
 

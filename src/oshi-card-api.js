@@ -117,31 +117,6 @@ const CARD_AT_INDEX_QUERY = `
   }
 `;
 
-const SETS_QUERY = `
-  query Sets {
-    sets
-  }
-`;
-
-const SET_CARDS_QUERY = `
-  query SetCards($setName: String!, $page: Int!) {
-    cards(filter: { setName: $setName }, page: $page, pageSize: 500) {
-      pageInfo {
-        hasNextPage
-      }
-      nodes {
-        id
-        cardNumber
-        name
-        rarity
-        cardType
-        imageUrl
-        cardUrl
-      }
-    }
-  }
-`;
-
 export const CARD_COLORS = ["WHITE", "GREEN", "RED", "BLUE", "PURPLE", "YELLOW", "NEUTRAL"];
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -456,30 +431,8 @@ export function createOshiCardApiClient({
     return data?.cards?.nodes?.[0] ?? null;
   }
 
-  async function listSets() {
-    const cached = cachedValue(searchCache, "sets");
-    if (cached !== undefined) return cached;
-    const data = await request(SETS_QUERY, {});
-    return cacheValue(searchCache, "sets", data?.sets ?? []);
-  }
-
-  async function getSetCards(setName) {
-    const key = `set|${setName.toLowerCase()}`;
-    const cached = cachedValue(searchCache, key);
-    if (cached !== undefined) return cached;
-    const cards = [];
-    for (let page = 1; page <= 10; page += 1) {
-      const data = await request(SET_CARDS_QUERY, { setName, page });
-      cards.push(...(data?.cards?.nodes ?? []));
-      if (!data?.cards?.pageInfo?.hasNextPage) break;
-    }
-    return cacheValue(searchCache, key, cards);
-  }
-
   return {
     countCards,
-    getSetCards,
-    listSets,
     findEnglishCardsByNumber,
     getCardSummaryAt,
     resolveEnglishCardQuery,
@@ -536,12 +489,4 @@ export function getCardSummaryAt(index, filter = {}) {
 
 export function getRandomCardSummary(filter = {}, random = Math.random) {
   return defaultClient.getRandomCardSummary(filter, random);
-}
-
-export function listSets() {
-  return defaultClient.listSets();
-}
-
-export function getSetCards(setName) {
-  return defaultClient.getSetCards(setName);
 }

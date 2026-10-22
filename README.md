@@ -25,13 +25,13 @@ The Japanese catalogue remains the preferred source of truth. The English catalo
 
 ### Packs and collections
 
-- `/openpack set:` opens an 8-card booster pack and saves the cards to your collection. Start typing to pick a set; only booster sets (including Extra Boosters) can be opened.
+- `/openpack set:` opens an 8-card booster pack and saves the cards to your collection. Start typing to pick a set (English or Japanese set names both work). Packs come from the Japanese catalogue, so every Japanese booster and extra booster is available, including sets not yet released in English.
 - `/collection user:` shows packs opened, unique cards, completion for each set, and the rarest cards pulled.
 - `/packcooldown hours:` lets members with **Manage Server** set how long people wait between packs (0 turns it off, the default). Run it without `hours` to see the current setting.
 
-Collections are kept separately for each server. Each pack has 6 common slots (C or U), 1 rare slot (R or RR), and 1 hit slot (SR, OSR, SY, UR, OUR, or SEC, with OUR and SEC the least likely). Cheer cards and S/HR printings are not pulled. The odds live in `data/pack-rates.json` as relative weights per slot; when a set has no cards of a rarity, the other rarities in that slot share its odds. They are approximations, not official pull rates.
+Collections are kept separately for each server. Each pack has 6 common slots (C or U), 1 rare slot (R or RR), and 1 hit slot (SR, OSR, SY, UR, OUR, or SEC, with OUR and SEC the least likely). Cheer cards and S/HR printings are not pulled. English set names come from `data/booster-sets.json`; a new set without an entry there still appears under its Japanese name until one is added. Each set's card list is loaded from the official site the first time it is opened and cached for six hours. The odds live in `data/pack-rates.json` as relative weights per slot; when a set has no cards of a rarity, the other rarities in that slot share its odds. They are approximations, not official pull rates.
 
-Collections are stored in a SQLite database at `data/grembot.db`. Set `DATABASE_PATH` to keep it somewhere else, and back that file up if the collections matter to your server.
+Packs opened before the switch to Japanese sets are kept and listed as English-edition sets in `/collection`. Collections are stored in a SQLite database at `data/grembot.db`. Set `DATABASE_PATH` to keep it somewhere else, and back that file up if the collections matter to your server.
 
 ### Inline lookups
 

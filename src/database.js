@@ -21,6 +21,7 @@ const SCHEMA = `
     guild_id TEXT NOT NULL,
     user_id TEXT NOT NULL,
     card_id INTEGER NOT NULL,
+    edition TEXT NOT NULL DEFAULT 'japanese',
     card_number TEXT NOT NULL,
     name TEXT NOT NULL,
     rarity TEXT NOT NULL,
@@ -37,6 +38,10 @@ export function openDatabase(path) {
   const db = new DatabaseSync(path);
   db.exec("PRAGMA journal_mode = WAL;");
   db.exec(SCHEMA);
+  // Packs were first pulled from English sets; keep those rows apart from Japanese card IDs.
+  if (!db.prepare("PRAGMA table_info(pulls)").all().some(column => column.name === "edition")) {
+    db.exec("ALTER TABLE pulls ADD COLUMN edition TEXT NOT NULL DEFAULT 'english'");
+  }
 
   const statements = {
     getCooldown: db.prepare("SELECT pack_cooldown_minutes AS minutes FROM guild_settings WHERE guild_id = ?"),
@@ -52,23 +57,23 @@ export function openDatabase(path) {
         packs_opened = packs_opened + 1
     `),
     insertPull: db.prepare(`
-      INSERT INTO pulls (guild_id, user_id, card_id, card_number, name, rarity, set_name, image_url, pulled_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO pulls (guild_id, user_id, card_id, edition, card_number, name, rarity, set_name, image_url, pulled_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `),
     packsOpened: db.prepare("SELECT packs_opened AS packsOpened FROM pack_opens WHERE guild_id = ? AND user_id = ?"),
     totals: db.prepare(`
-      SELECT COUNT(*) AS total, COUNT(DISTINCT card_id) AS unique_cards
+      SELECT COUNT(*) AS total, COUNT(DISTINCT edition || ':' || card_id) AS unique_cards
       FROM pulls WHERE guild_id = ? AND user_id = ?
     `),
     setCounts: db.prepare(`
-      SELECT set_name AS setName, COUNT(DISTINCT card_id) AS owned
+      SELECT set_name AS setName, edition, COUNT(DISTINCT card_id) AS owned
       FROM pulls WHERE guild_id = ? AND user_id = ?
-      GROUP BY set_name ORDER BY set_name
+      GROUP BY edition, set_name ORDER BY edition DESC, set_name
     `),
     ownedCards: db.prepare(`
-      SELECT card_id AS cardId, card_number AS cardNumber, name, rarity, COUNT(*) AS copies
+      SELECT card_id AS cardId, edition, card_number AS cardNumber, name, rarity, COUNT(*) AS copies
       FROM pulls WHERE guild_id = ? AND user_id = ?
-      GROUP BY card_id
+      GROUP BY edition, card_id
     `)
   };
 
@@ -94,7 +99,7 @@ export function openDatabase(path) {
     },
 
     // Checks the cooldown and saves the pack in one transaction so double-clicks cannot skip it.
-    savePack({ guildId, userId, setName, cards, now = Date.now() }) {
+    savePack({ guildId, userId, setName, cards, edition = "japanese", now = Date.now() }) {
       db.exec("BEGIN IMMEDIATE");
       try {
         const availableAt = packAvailableAt(guildId, userId);
@@ -105,7 +110,7 @@ export function openDatabase(path) {
         statements.recordOpen.run(guildId, userId, now);
         for (const card of cards) {
           statements.insertPull.run(
-            guildId, userId, card.id, card.cardNumber, card.name, card.rarity, setName, card.imageUrl ?? null, now
+            guildId, userId, card.id, edition, card.cardNumber, card.name, card.rarity, setName, card.imageUrl ?? null, now
           );
         }
         db.exec("COMMIT");
