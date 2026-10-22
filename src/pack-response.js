@@ -15,19 +15,36 @@ function cardLine(card) {
   return `${marker}\`${card.rarity.padEnd(3)}\` ${card.cardNumber} — ${card.name}`;
 }
 
-export function buildPackMessage({ userName, setName, cards, best, imageFile = null, packsOpened = null }) {
+const OPEN_PACK_BUTTON_PREFIX = "openpack:";
+
+export function openPackButtonId(setCode) {
+  return `${OPEN_PACK_BUTTON_PREFIX}${setCode}`;
+}
+
+export function parseOpenPackButtonId(customId) {
+  if (!customId.startsWith(OPEN_PACK_BUTTON_PREFIX)) return null;
+  const code = customId.slice(OPEN_PACK_BUTTON_PREFIX.length);
+  return /^[A-Za-z0-9]{2,16}$/.test(code) ? code : null;
+}
+
+export function buildPackMessage({ userName, set, cards, best, imageFile = null, packsOpened = null }) {
   const sorted = sortPackCards(cards);
   const special = SPECIAL_RARITIES.has(best.rarity);
   const embed = new EmbedBuilder()
     .setColor(special ? SPECIAL_COLOR : PACK_COLOR)
-    .setTitle(`${userName} opened ${setName}`)
+    .setTitle(`${userName} opened ${set.name}`)
     .setDescription(sorted.map(cardLine).join("\n"))
     .addFields({ name: special ? `✨ ${best.rarity} pull!` : "Best pull", value: `${best.name} — ${best.cardNumber} [${best.rarity}]` });
   if (packsOpened) embed.setFooter({ text: `Pack #${packsOpened} in this server • /collection to see your cards` });
 
   const imageUrl = imageFile ? `attachment://${imageFile.name}` : best.imageUrl;
   if (imageUrl) embed.setImage(imageUrl);
-  const payload = { embeds: [embed] };
+  const openAnother = new ButtonBuilder()
+    .setCustomId(openPackButtonId(set.code))
+    .setLabel(`Open another ${set.name}`.slice(0, 80))
+    .setEmoji("🎴")
+    .setStyle(ButtonStyle.Primary);
+  const payload = { embeds: [embed], components: [new ActionRowBuilder().addComponents(openAnother)] };
   if (imageFile) payload.files = [new AttachmentBuilder(imageFile.data, { name: imageFile.name })];
   return payload;
 }

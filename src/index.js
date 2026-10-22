@@ -14,6 +14,7 @@ import { loadCardExtras, lookupCards, lookupCardsForSummary } from "./card-looku
 import { buildDailyCardMessage, startDailyCardSchedule } from "./daily-card.js";
 import { openDatabase } from "./database.js";
 import { createPackHandlers } from "./pack-commands.js";
+import { parseOpenPackButtonId } from "./pack-response.js";
 import { PackError } from "./packs.js";
 import {
   findEnglishCardsByNumber,
@@ -200,8 +201,9 @@ client.on(Events.InteractionCreate, async interaction => {
     await packHandlers.autocomplete(interaction).catch(error => console.error(error));
     return;
   }
-  if (!interaction.isChatInputCommand()) return;
-  const handler = commandHandlers[interaction.commandName];
+  let handler;
+  if (interaction.isChatInputCommand()) handler = commandHandlers[interaction.commandName];
+  else if (interaction.isButton() && parseOpenPackButtonId(interaction.customId)) handler = packHandlers.openpackButton;
   if (!handler) return;
   try {
     await handler(interaction);

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { openDatabase } from "../src/database.js";
-import { buildCollectionEmbed, buildPackMessage, formatCooldown } from "../src/pack-response.js";
+import { buildCollectionEmbed, buildPackMessage, formatCooldown, parseOpenPackButtonId } from "../src/pack-response.js";
 import { bestPull, openPack, PACK_RATES, PackError, pullableCards, toPackCard } from "../src/packs.js";
 import { parseBoosterSets } from "../src/card-site.js";
 
@@ -158,7 +158,15 @@ test("shows the pack rarest-last and highlights special pulls", () => {
     { id: 1, cardNumber: "hBP01-001", name: "Top", rarity: "SEC", imageUrl: "https://example.com/sec.png" },
     { id: 2, cardNumber: "hBP01-002", name: "Filler", rarity: "C" }
   ];
-  const embed = buildPackMessage({ userName: "Julian", setName: "Booster Pack – Test", cards: pack, best: bestPull(pack), packsOpened: 3 }).embeds[0].data;
+  const message = buildPackMessage({ userName: "Julian", set: { code: "hBP08", name: "Bouncer Bound (hBP08)" }, cards: pack, best: bestPull(pack), packsOpened: 3 });
+  const embed = message.embeds[0].data;
+  const button = message.components[0].components[0].data;
+  assert.equal(embed.title, "Julian opened Bouncer Bound (hBP08)");
+  assert.equal(button.custom_id, "openpack:hBP08");
+  assert.equal(button.label, "Open another Bouncer Bound (hBP08)");
+  assert.equal(parseOpenPackButtonId(button.custom_id), "hBP08");
+  assert.equal(parseOpenPackButtonId("binder-next"), null);
+  assert.equal(parseOpenPackButtonId("openpack:../x"), null);
   assert.match(embed.description, /^`C  ` hBP01-002 — Filler\n✨ `SEC` hBP01-001 — Top$/);
   assert.equal(embed.fields[0].name, "✨ SEC pull!");
   assert.equal(embed.image.url, "https://example.com/sec.png");

@@ -9,6 +9,7 @@ import {
   buildPackMessage,
   formatCooldown,
   LEADERBOARD_CATEGORIES,
+  parseOpenPackButtonId,
   sortBinderCards
 } from "./pack-response.js";
 import { buildPackGridImage } from "./pack-image.js";
@@ -28,6 +29,36 @@ async function packImageFile(cards, best) {
     console.warn(`Could not attach ${best.imageUrl}; using the remote image URL.`, error);
     return null;
   });
+}
+
+async function openPackFor(db, interaction, set) {
+  const { guildId } = interaction;
+  const userId = interaction.user.id;
+  const availableAt = db.packAvailableAt(guildId, userId);
+  if (availableAt > Date.now()) {
+    await interaction.reply({ content: cooldownMessage(availableAt), flags: MessageFlags.Ephemeral });
+    return;
+  }
+
+  await interaction.deferReply();
+  const cards = openPack(await setPackCards(set.code));
+  const result = db.savePack({ guildId, userId, setName: set.code, cards });
+  if (!result.saved) {
+    await interaction.editReply(cooldownMessage(result.availableAt));
+    return;
+  }
+
+  const best = bestPull(cards);
+  const canAttachFiles = interaction.appPermissions?.has(PermissionFlagsBits.AttachFiles) ?? false;
+  const imageFile = canAttachFiles ? await packImageFile(cards, best) : null;
+  await interaction.editReply(buildPackMessage({
+    userName: interaction.member?.displayName ?? interaction.user.displayName,
+    set,
+    cards,
+    best,
+    imageFile,
+    packsOpened: db.packsOpened(guildId, userId)
+  }));
 }
 
 function cooldownMessage(availableAt) {
@@ -61,34 +92,21 @@ export function createPackHandlers(db) {
         });
         return;
       }
+      await openPackFor(db, interaction, set);
+    },
 
-      const { guildId } = interaction;
-      const userId = interaction.user.id;
-      const availableAt = db.packAvailableAt(guildId, userId);
-      if (availableAt > Date.now()) {
-        await interaction.reply({ content: cooldownMessage(availableAt), flags: MessageFlags.Ephemeral });
+    // The "Open another" button under a pack opens one for whoever clicks it.
+    async openpackButton(interaction) {
+      const code = parseOpenPackButtonId(interaction.customId);
+      const set = code && (await listJapaneseBoosterSets()).find(candidate => candidate.code === code);
+      if (!set) {
+        await interaction.reply({
+          content: "That set can't be opened anymore. Use `/openpack` to pick another.",
+          flags: MessageFlags.Ephemeral
+        });
         return;
       }
-
-      await interaction.deferReply();
-      const cards = openPack(await setPackCards(set.code));
-      const result = db.savePack({ guildId, userId, setName: set.code, cards });
-      if (!result.saved) {
-        await interaction.editReply(cooldownMessage(result.availableAt));
-        return;
-      }
-
-      const best = bestPull(cards);
-      const canAttachFiles = interaction.appPermissions?.has(PermissionFlagsBits.AttachFiles) ?? false;
-      const imageFile = canAttachFiles ? await packImageFile(cards, best) : null;
-      await interaction.editReply(buildPackMessage({
-        userName: interaction.member?.displayName ?? interaction.user.displayName,
-        setName: set.name,
-        cards,
-        best,
-        imageFile,
-        packsOpened: db.packsOpened(guildId, userId)
-      }));
+      await openPackFor(db, interaction, set);
     },
 
     async collection(interaction) {
