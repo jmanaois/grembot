@@ -50,7 +50,7 @@ test("shows rarity order and readable odds", () => {
   const general = buildPackRatesEmbed({ odds: packOdds({ rates }) }).toJSON();
   assert.equal(general.title, "Pack rates");
   assert.match(general.description, /\*\*8 cards per pack\.\*\*/);
-  assert.match(general.description, /`C` < `U` < `R` < `RR` < `SR` < `SY` < `OSR` < `UR` < `OUR` < `SEC`/);
+  assert.match(general.description, /`C` < `U` < `R` < `S` < `RR` < `SR` < `SY` < `OSR` < `UR` < `HR` < `OUR` < `SEC`/);
   assert.deepEqual(general.fields.map(field => field.name), ["Common slots ×6", "Rare slot", "Hit slot"]);
   assert.equal(general.fields[0].value.split("\n")[1], "`U  ` 25.0% per card • in 82.2% of packs");
   assert.equal(general.fields[1].value.split("\n")[0], "`R  ` 75.0%");

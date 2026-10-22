@@ -67,10 +67,9 @@ test("opens 8-card packs with 6 common, 1 rare, and 1 hit slot", () => {
   assert.equal(pack.length, 8);
   assert.deepEqual(pack.map(card => card.slot), [...Array(6).fill("Common"), "Rare", "Hit"]);
   assert.ok(pack.slice(0, 6).every(card => ["C", "U"].includes(card.rarity) && card.cardType !== "CHEER"));
-  assert.ok(["R", "RR"].includes(pack[6].rarity));
-  assert.ok(["SR", "OSR", "SY", "UR", "OUR", "SEC"].includes(pack[7].rarity));
+  assert.ok(["R", "S", "RR"].includes(pack[6].rarity));
+  assert.ok(["SR", "OSR", "SY", "UR", "HR", "OUR", "SEC"].includes(pack[7].rarity));
   assert.equal(new Set(pack.map(card => card.id)).size, 8);
-  assert.ok(!pack.some(card => card.rarity === "S"));
 });
 
 test("makes OUR and SEC the rarest hits and gives missing rarities' odds to the most common one", () => {
@@ -84,7 +83,7 @@ test("makes OUR and SEC the rarest hits and gives missing rarities' odds to the 
   assert.ok(hits.SR > hits.OSR && hits.SR > hits.UR);
   assert.ok(hits.OUR < hits.OSR && hits.OUR < hits.UR);
   assert.ok(hits.SEC < hits.OSR && hits.SEC < hits.UR);
-  // SY's weight goes to SR, so SEC keeps its 4% and SR gets 68%.
+  // This set has no SY or HR, so their weight goes to SR (54 + 8 + 6) and SEC keeps its 4%.
   assert.ok(Math.abs(hits.SEC / 5_000 - 0.04) < 0.012);
   assert.ok(Math.abs(hits.SR / 5_000 - 0.68) < 0.03);
 });
@@ -94,7 +93,7 @@ test("refuses sets with no pullable cards", () => {
 });
 
 test("counts only pullable cards toward set completion", () => {
-  assert.equal(pullableCards(setCards).length, setCards.length - 3 - 5);
+  assert.equal(pullableCards(setCards).length, setCards.length - 3);
   assert.equal(PACK_RATES.slots.reduce((sum, slot) => sum + slot.count, 0), 8);
 });
 

@@ -141,7 +141,7 @@ export function buildBinderPage({ userName, setName, cards, owned, page = 0, fil
 export const LEADERBOARD_CATEGORIES = {
   unique: { title: "Most unique cards", unit: ["unique card", "unique cards"] },
   packs: { title: "Most packs opened", unit: ["pack", "packs"] },
-  special: { title: "Most UR/OUR/SEC pulls", unit: ["special pull", "special pulls"] }
+  special: { title: "Most UR/HR/OUR/SEC pulls", unit: ["special pull", "special pulls"] }
 };
 const MEDALS = ["🥇", "🥈", "🥉"];
 
@@ -187,7 +187,7 @@ export function buildPackRatesEmbed({ set = null, odds }) {
       RARITY_ORDER.map(rarity => `\`${rarity}\``).join(" < "),
       set ? "" : "\nPick a set to see its card counts and odds for a specific card. Sets missing a rarity give its odds to the most common rarity in that slot."
     ].join("\n").trim())
-    .setFooter({ text: "These are this bot's approximate rates, not official pull rates. Cheer cards and S/HR/OC/P printings aren't in packs." });
+    .setFooter({ text: "These are this bot's approximate rates, not official pull rates. Cheer cards and OC/P printings aren't in packs." });
   for (const slot of odds) {
     embed.addFields({
       name: slot.count > 1 ? `${slot.name} slots ×${slot.count}` : `${slot.name} slot`,

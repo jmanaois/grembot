@@ -94,7 +94,7 @@ export function openDatabase(path) {
     `),
     leaderboardSpecial: db.prepare(`
       SELECT user_id AS userId, COUNT(*) AS score
-      FROM pulls WHERE guild_id = ? AND rarity IN ('UR', 'OUR', 'SEC') GROUP BY user_id
+      FROM pulls WHERE guild_id = ? AND rarity IN ('UR', 'HR', 'OUR', 'SEC') GROUP BY user_id
     `)
   };
   const leaderboardStatements = {

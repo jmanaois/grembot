@@ -94,7 +94,7 @@ export const leaderboardCommand = new SlashCommandBuilder()
     .addChoices(
       { name: "Unique cards", value: "unique" },
       { name: "Packs opened", value: "packs" },
-      { name: "UR/OUR/SEC pulls", value: "special" }
+      { name: "UR/HR/OUR/SEC pulls", value: "special" }
     ));
 
 export const packRatesCommand = new SlashCommandBuilder()

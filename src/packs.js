@@ -3,8 +3,8 @@ import { readFileSync } from "node:fs";
 export const PACK_RATES = JSON.parse(
   readFileSync(new URL("../data/pack-rates.json", import.meta.url), "utf8")
 );
-export const RARITY_ORDER = ["C", "U", "R", "RR", "SR", "SY", "OSR", "UR", "OUR", "SEC"];
-export const SPECIAL_RARITIES = new Set(["UR", "OUR", "SEC"]);
+export const RARITY_ORDER = ["C", "U", "R", "S", "RR", "SR", "SY", "OSR", "UR", "HR", "OUR", "SEC"];
+export const SPECIAL_RARITIES = new Set(["UR", "HR", "OUR", "SEC"]);
 
 export class PackError extends Error {}
 

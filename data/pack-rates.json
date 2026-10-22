@@ -1,7 +1,7 @@
 {
   "slots": [
     { "name": "Common", "count": 6, "rarities": { "C": 3, "U": 1 } },
-    { "name": "Rare", "count": 1, "rarities": { "R": 3, "RR": 1 } },
-    { "name": "Hit", "count": 1, "rarities": { "SR": 60, "OSR": 12, "UR": 12, "SY": 8, "OUR": 4, "SEC": 4 } }
+    { "name": "Rare", "count": 1, "rarities": { "R": 50, "S": 25, "RR": 25 } },
+    { "name": "Hit", "count": 1, "rarities": { "SR": 54, "OSR": 12, "UR": 12, "SY": 8, "HR": 6, "OUR": 4, "SEC": 4 } }
   ]
 }

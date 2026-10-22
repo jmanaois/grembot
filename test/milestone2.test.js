@@ -93,7 +93,7 @@ test("shows the top ten and the viewer's own rank", () => {
   const rows = Array.from({ length: 12 }, (_, index) => ({ userId: `u${index}`, score: 12 - index, rank: index + 1 }));
   const embed = buildLeaderboardEmbed({ guildName: "Holo", category: "special", rows, viewerId: "u11" });
   const lines = embed.data.description.split("\n");
-  assert.equal(embed.data.title, "Most UR/OUR/SEC pulls in Holo");
+  assert.equal(embed.data.title, "Most UR/HR/OUR/SEC pulls in Holo");
   assert.equal(lines[0], "🥇 <@u0> — 12 special pulls");
   assert.equal(lines[9], "**10.** <@u9> — 3 special pulls");
   assert.deepEqual(lines.slice(10), ["…", "**12.** <@u11> — 1 special pull"]);
