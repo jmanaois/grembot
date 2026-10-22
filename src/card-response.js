@@ -46,7 +46,7 @@ function buildEnglishPricingField(pricing) {
   return { name: "English market price (USD)", value: lines.join("\n"), inline: true };
 }
 
-export function buildCardEmbed(card, variantIndex, variantCount, imageUrl = card.imageUrl, englishPricing = null) {
+export function buildCardEmbed(card, variantIndex, variantCount, imageUrl = card.imageUrl, englishPricing = null, characterLimit = 5_500) {
   const summary = Object.entries(card.metadata)
     .filter(([key]) => !["レアリティ", "収録商品", "Rarity", "Set"].includes(key))
     .map(([key, value]) => `**${key}:** ${value}`)
@@ -61,7 +61,7 @@ export function buildCardEmbed(card, variantIndex, variantCount, imageUrl = card
   if (card.detailUrl) embed.setURL(card.detailUrl);
   if (imageUrl) embed.setImage(imageUrl);
 
-  let characterBudget = 5_500 - card.number.length - card.name.length;
+  let characterBudget = characterLimit - card.number.length - card.name.length;
   const addFieldWithinBudget = (field) => {
     if (characterBudget <= field.name.length + 1) return;
     const value = truncate(field.value, Math.min(MAX_FIELD_VALUE, characterBudget - field.name.length));
@@ -133,4 +133,77 @@ export function buildCardMessage(cards, selectedIndex = 0, imageFile = null, eng
     payload.files = [new AttachmentBuilder(imageFile.data, { name: imageFile.name })];
   }
   return payload;
+}
+
+function formatTrend(trend) {
+  if (!trend) return null;
+  const sign = trend.change > 0 ? "+" : trend.change < 0 ? "−" : "±";
+  const arrow = trend.change > 0 ? "▲" : trend.change < 0 ? "▼" : "▬";
+  const amount = formatUsd(Math.abs(trend.change));
+  const percent = Number.isFinite(trend.percent) ? ` (${sign}${Math.abs(trend.percent).toFixed(1)}%)` : "";
+  return `${arrow} ${sign}${amount}${percent} ${trend.days}d`;
+}
+
+export function buildPriceEmbed(cards) {
+  const sortPrice = pricing => pricing.marketPrice ?? pricing.lowPrice ?? -1;
+  const priced = cards
+    .filter(card => card.englishPricing)
+    .sort((left, right) => sortPrice(right.englishPricing) - sortPrice(left.englishPricing));
+  const first = cards[0];
+  const embed = new EmbedBuilder()
+    .setColor(EMBED_COLOR)
+    .setTitle(`${first.number} — ${first.name} prices`)
+    .setFooter({ text: "English printings • USD • TCGPlayer data via Oshi Card API" });
+  if (first.detailUrl) embed.setURL(first.detailUrl);
+  if (first.imageUrl) embed.setThumbnail(first.imageUrl);
+
+  if (priced.length === 0) {
+    embed.setDescription("No English printing of this card has price data yet.");
+    return embed;
+  }
+  embed.addFields(priced.slice(0, 25).map(card => {
+    const pricing = card.englishPricing;
+    const lines = [];
+    const marketPrice = formatUsd(pricing.marketPrice);
+    const lowPrice = formatUsd(pricing.lowPrice);
+    if (marketPrice) lines.push(`**Market:** ${marketPrice}`);
+    if (lowPrice) lines.push(`**Low:** ${lowPrice}`);
+    for (const trend of card.englishPriceTrends ?? []) lines.push(formatTrend(trend));
+    return { name: card.rarity, value: lines.join("\n") || "—", inline: true };
+  }));
+
+  const updatedAt = Date.parse(priced[0].englishPricing.updatedAt);
+  if (Number.isFinite(updatedAt)) embed.setDescription(`Updated <t:${Math.floor(updatedAt / 1000)}:R>`);
+  return embed;
+}
+
+export function buildMultiCardMessage(entries, content = undefined) {
+  const embeds = [];
+  const files = [];
+  const shownEntries = entries.slice(0, 10);
+  const characterLimit = Math.floor(5_500 / Math.max(shownEntries.length, 1));
+  for (const { card, imageFile, englishPricing } of shownEntries) {
+    embeds.push(buildCardEmbed(
+      card,
+      0,
+      1,
+      imageFile ? `attachment://${imageFile.name}` : card.imageUrl,
+      englishPricing,
+      characterLimit
+    ));
+    if (imageFile && !files.some(file => file.name === imageFile.name)) {
+      files.push(new AttachmentBuilder(imageFile.data, { name: imageFile.name }));
+    }
+  }
+  const payload = { embeds, components: [], attachments: [] };
+  if (content) payload.content = content;
+  if (files.length > 0) payload.files = files;
+  return payload;
+}
+
+export function buildCompareSummary(entries) {
+  return entries.map(({ card, englishPricing }) => {
+    const price = formatUsd(englishPricing?.marketPrice);
+    return `**${card.name}** ${card.number} [${card.rarity}]${price ? ` — ${price}` : ""}`;
+  }).join("\n**vs**\n");
 }

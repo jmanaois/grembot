@@ -103,6 +103,23 @@ const SEARCH_CARDS_QUERY = `
   }
 `;
 
+const CARD_AT_INDEX_QUERY = `
+  query CardAtIndex($filter: CardFilter, $page: Int!) {
+    cards(filter: $filter, page: $page, pageSize: 1) {
+      totalCount
+      nodes {
+        id
+        cardNumber
+        name
+        rarity
+      }
+    }
+  }
+`;
+
+export const CARD_COLORS = ["WHITE", "GREEN", "RED", "BLUE", "PURPLE", "YELLOW", "NEUTRAL"];
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 export class OshiCardApiError extends Error {}
 
 function latestPrice(prices) {
@@ -140,6 +157,26 @@ export function selectEnglishPricing(cards, cardNumber, rarity) {
     highPrice: price.highPrice,
     marketPrice: price.marketPrice,
     directLowPrice: price.directLowPrice
+  };
+}
+
+export function summarizePriceTrend(prices, days) {
+  const marketPrices = prices
+    .filter(price => Number.isFinite(price.marketPrice) && Number.isFinite(Date.parse(price.date)))
+    .sort((left, right) => Date.parse(right.date) - Date.parse(left.date));
+  if (marketPrices.length === 0) return null;
+
+  const latest = marketPrices[0];
+  const cutoff = Date.parse(latest.date) - days * DAY_MS;
+  const previous = marketPrices.find(price => Date.parse(price.date) <= cutoff);
+  if (!previous) return null;
+  const change = latest.marketPrice - previous.marketPrice;
+  return {
+    days,
+    from: previous.marketPrice,
+    to: latest.marketPrice,
+    change,
+    percent: previous.marketPrice > 0 ? (change / previous.marketPrice) * 100 : null
   };
 }
 
@@ -215,7 +252,10 @@ export function mapEnglishCard(card) {
     setNames: card.setNames ?? [],
     sections,
     edition: "english",
-    englishPricing: selectEnglishPricing([card], card.cardNumber, card.rarity)
+    englishPricing: selectEnglishPricing([card], card.cardNumber, card.rarity),
+    englishPriceTrends: [7, 30]
+      .map(days => summarizePriceTrend(card.pricingData?.dailyPrices ?? [], days))
+      .filter(Boolean)
   };
 }
 
@@ -371,10 +411,38 @@ export function createOshiCardApiClient({
     return { cards, searchResults, rarity, edition: "english" };
   }
 
+  function cardFilter({ rarity = null, color = null } = {}) {
+    const filter = {};
+    if (rarity) filter.rarity = rarity.toUpperCase();
+    if (color) filter.color = color.toUpperCase();
+    return filter;
+  }
+
+  async function countCards(filter = {}) {
+    const key = JSON.stringify(cardFilter(filter));
+    const cached = cachedValue(searchCache, `count|${key}`);
+    if (cached !== undefined) return cached;
+    const data = await request(CARD_AT_INDEX_QUERY, { filter: cardFilter(filter), page: 1 });
+    return cacheValue(searchCache, `count|${key}`, data?.cards?.totalCount ?? 0);
+  }
+
+  async function getCardSummaryAt(index, filter = {}) {
+    const data = await request(CARD_AT_INDEX_QUERY, { filter: cardFilter(filter), page: index + 1 });
+    return data?.cards?.nodes?.[0] ?? null;
+  }
+
   return {
+    countCards,
     findEnglishCardsByNumber,
+    getCardSummaryAt,
     resolveEnglishCardQuery,
     searchEnglishCardSummaries,
+
+    async getRandomCardSummary(filter = {}, random = Math.random) {
+      const total = await countCards(filter);
+      if (total === 0) return null;
+      return getCardSummaryAt(Math.floor(random() * total), filter);
+    },
 
     async getEnglishCardPricing(cardNumber, rarity) {
       const normalizedNumber = cardNumber.trim();
@@ -409,4 +477,16 @@ export function searchEnglishCardSummaries(search, rarity = null) {
 
 export function resolveEnglishCardQuery(query) {
   return defaultClient.resolveEnglishCardQuery(query);
+}
+
+export function countCards(filter = {}) {
+  return defaultClient.countCards(filter);
+}
+
+export function getCardSummaryAt(index, filter = {}) {
+  return defaultClient.getCardSummaryAt(index, filter);
+}
+
+export function getRandomCardSummary(filter = {}, random = Math.random) {
+  return defaultClient.getRandomCardSummary(filter, random);
 }
